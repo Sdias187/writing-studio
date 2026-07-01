@@ -37,7 +37,8 @@ export async function saveProject(project: Project): Promise<void> {
 }
 
 export async function deleteProject(id: string): Promise<void> {
-  await db.transaction("rw", db.projects, db.chapters, db.scenes, db.characters, db.locations, db.notes, async () => {
+  const tables = [db.projects, db.chapters, db.scenes, db.characters, db.locations, db.notes] as const
+  await db.transaction("rw", tables, async () => {
     await db.projects.delete(id)
     await db.chapters.where("projectId").equals(id).delete()
     await db.scenes.where("projectId").equals(id).delete()
@@ -79,7 +80,7 @@ export async function deleteScene(id: string): Promise<void> {
 }
 
 export async function reorderItems<T extends { id: string; order: number }>(
-  table: EntityTable<T, string>,
+  table: EntityTable<T, "id">,
   items: { id: string; order: number }[]
 ): Promise<void> {
   await db.transaction("rw", table, async () => {

@@ -1,6 +1,6 @@
 import { create } from "zustand"
 import type { Project, Chapter, Scene } from "@/types"
-import { db, getProjects, getChapters, getScenes, saveProject, saveChapter, saveScene } from "@/db"
+import { getProjects, getChapters, getScenes, saveProject, saveChapter, saveScene, deleteProject as dbDeleteProject } from "@/db"
 import { generateId } from "@/lib/utils"
 
 interface ProjectState {
@@ -13,13 +13,14 @@ interface ProjectState {
   loadProjects: () => Promise<void>
   setCurrentProject: (project: Project) => Promise<void>
   createProject: (title: string, description?: string) => Promise<Project>
+  deleteProject: (id: string) => Promise<void>
   loadChapters: (projectId: string) => Promise<void>
   createChapter: (projectId: string, title: string) => Promise<Chapter>
   loadScenes: (chapterId: string) => Promise<void>
   createScene: (chapterId: string, projectId: string, title: string) => Promise<Scene>
 }
 
-export const useProjectStore = create<ProjectState>((set, get) => ({
+export const useProjectStore = create<ProjectState>((set, _get) => ({
   projects: [],
   currentProject: null,
   chapters: [],
@@ -56,6 +57,12 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const projects = await getProjects()
     set({ projects })
     return project
+  },
+
+  deleteProject: async (id: string) => {
+    await dbDeleteProject(id)
+    const projects = await getProjects()
+    set({ projects })
   },
 
   loadChapters: async (projectId: string) => {

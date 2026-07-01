@@ -10,6 +10,8 @@ import { OverflowMenu } from "./overflow-menu"
 import { ToolbarColors } from "./toolbar-colors"
 import { primaryGroups, overflowGroups, moreIcon } from "./toolbar-config"
 
+const MAX_IMAGE_SIZE = 2 * 1024 * 1024 // 2MB
+
 const IDLE_TIMEOUT = 3000
 const BLUR_DELAY = 300
 
@@ -18,6 +20,7 @@ function useToolbarVisibility(editor: Editor | null) {
   const idleRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const blurRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isFocusMode = useEditorStore((s) => s.isFocusMode)
+  const keepVisibleRef = useRef(false)
 
   const clearIdle = useCallback(() => {
     if (idleRef.current) {
@@ -28,7 +31,9 @@ function useToolbarVisibility(editor: Editor | null) {
 
   const resetIdle = useCallback(() => {
     clearIdle()
-    idleRef.current = setTimeout(() => setVisible(false), IDLE_TIMEOUT)
+    if (!keepVisibleRef.current) {
+      idleRef.current = setTimeout(() => setVisible(false), IDLE_TIMEOUT)
+    }
   }, [clearIdle])
 
   const show = useCallback(() => {
@@ -48,7 +53,9 @@ function useToolbarVisibility(editor: Editor | null) {
     const onFocus = () => show()
     const onBlur = () => {
       clearIdle()
-      blurRef.current = setTimeout(() => setVisible(false), BLUR_DELAY)
+      blurRef.current = setTimeout(() => {
+        if (!keepVisibleRef.current) setVisible(false)
+      }, BLUR_DELAY)
     }
     const onSelectionUpdate = () => show()
 
@@ -96,7 +103,7 @@ function useToolbarVisibility(editor: Editor | null) {
   // Hide completely in focus mode
   const showToolbar = isFocusMode ? false : visible
 
-  return { visible: showToolbar, onMouseEnter, onMouseLeave }
+  return { visible: showToolbar, onMouseEnter, onMouseLeave, keepVisibleRef, resetIdle }
 }
 
 interface FloatingToolbarProps {
@@ -104,11 +111,20 @@ interface FloatingToolbarProps {
 }
 
 export function FloatingToolbar({ editor }: FloatingToolbarProps) {
-  const { visible, onMouseEnter, onMouseLeave } = useToolbarVisibility(editor)
+  const { visible, onMouseEnter, onMouseLeave, keepVisibleRef, resetIdle } = useToolbarVisibility(editor)
   const [overflowOpen, setOverflowOpen] = useState(false)
   const [colorPickerType, setColorPickerType] = useState<"text" | "highlight" | null>(null)
+
+  // Keep toolbar visible while menus are open; restart idle when they close
+  useEffect(() => {
+    keepVisibleRef.current = overflowOpen || colorPickerType !== null
+    if (!keepVisibleRef.current) {
+      resetIdle()
+    }
+  }, [overflowOpen, colorPickerType, keepVisibleRef, resetIdle])
   const reducedMotion = useReducedMotion()
   const toolbarRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [, forceRender] = useState(0)
 
   // Re-render on editor state changes so isActive/isDisabled reflect current selection
@@ -122,6 +138,30 @@ export function FloatingToolbar({ editor }: FloatingToolbarProps) {
       editor.off("update", onStateChange)
     }
   }, [editor])
+
+  // Image file upload handler
+  const handleImageFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (file.size > MAX_IMAGE_SIZE) {
+      alert("A imagem deve ter no máximo 2MB.")
+      e.target.value = ""
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      const base64 = reader.result as string
+      editor?.chain().focus().setImage({ src: base64 }).run()
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ""
+  }, [editor])
+
+  const handleImageButton = useCallback(() => {
+    fileInputRef.current?.click()
+  }, [])
 
   // Close overflow when toolbar hides
   useEffect(() => {
@@ -152,10 +192,20 @@ export function FloatingToolbar({ editor }: FloatingToolbarProps) {
     : {
         initial: { opacity: 0, scale: 0.92, y: 16 },
         animate: { opacity: visible ? 1 : 0, scale: visible ? 1 : 0.92, y: visible ? 0 : 8 },
-        transition: { duration: visible ? 0.25 : 0.2, ease: [0.16, 1, 0.3, 1] },
+        transition: { duration: visible ? 0.25 : 0.2, ease: [0.16, 1, 0.3, 1] as const },
       }
 
   return (
+    <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleImageFile}
+        className="hidden"
+        aria-hidden="true"
+        tabIndex={-1}
+      />
       <motion.div
         ref={toolbarRef}
         role="toolbar"
@@ -171,9 +221,18 @@ export function FloatingToolbar({ editor }: FloatingToolbarProps) {
           {primaryGroups.map((group) => (
             <div key={group.id} className="flex items-center gap-0.5">
               <ToolbarDivider />
-              {group.buttons.map((def) => (
-                <ToolbarButton key={def.id} editor={editor} def={def} />
-              ))}
+              {group.buttons.map((def) => {
+                if (def.id === "image") {
+                  return (
+                    <ToolbarButton
+                      key="image"
+                      editor={editor}
+                      def={{ ...def, action: handleImageButton }}
+                    />
+                  )
+                }
+                return <ToolbarButton key={def.id} editor={editor} def={def} />
+              })}
             </div>
           ))}
 
@@ -240,5 +299,6 @@ export function FloatingToolbar({ editor }: FloatingToolbarProps) {
           </div>
         </div>
       </motion.div>
+    </>
   )
 }

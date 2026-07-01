@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react"
+import { useEffect } from "react"
 import { useEditor, EditorContent } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
 import Underline from "@tiptap/extension-underline"
@@ -15,11 +15,15 @@ import TableRow from "@tiptap/extension-table-row"
 import TableCell from "@tiptap/extension-table-cell"
 import TableHeader from "@tiptap/extension-table-header"
 import ImageExtension from "@tiptap/extension-image"
+import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight"
+import { common, createLowlight } from "lowlight"
 import { BubbleMenu } from "./bubble-menu"
 import { SlashMenu } from "./slash-menu"
 import { FloatingToolbar } from "./floating-toolbar/floating-toolbar"
 import { useEditorStore } from "@/stores/editor-store"
 import { wordCount } from "@/lib/utils"
+
+const lowlight = createLowlight(common)
 
 export function Editor() {
   const {
@@ -37,7 +41,9 @@ export function Editor() {
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
+        codeBlock: false,
       }),
+      CodeBlockLowlight.configure({ lowlight }),
       Underline,
       TextStyle,
       Color,

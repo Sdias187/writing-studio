@@ -4,6 +4,7 @@ import { IconButton } from "@/components/ui/button"
 import { useEditorStore } from "@/stores/editor-store"
 import { useProjectStore } from "@/stores/project-store"
 import { exportSceneAsMarkdown, exportSceneAsTxt, exportProjectAsMarkdown, exportProjectAsTxt } from "@/lib/export"
+import { createBackup, downloadBackup, parseBackupFile, restoreBackup } from "@/lib/backup"
 import type { ProjectView } from "@/App"
 
 const statusLabel = {
@@ -31,11 +32,12 @@ interface TopBarProps {
   onNavigate?: (view: ProjectView) => void
 }
 
-export function TopBar({ onBack, currentView = "editor", onNavigate }: TopBarProps) {
+export function TopBar({ onBack, currentView = "editor", onNavigate: _onNavigate }: TopBarProps) {
   const { saveStatus, wordCount, isFocusMode, setFocusMode, editor, activeScene, content, save } = useEditorStore()
   const { currentProject } = useProjectStore()
   const [showExport, setShowExport] = useState(false)
   const exportRef = useRef<HTMLDivElement>(null)
+  const backupInputRef = useRef<HTMLInputElement>(null)
 
   // Close export dropdown on outside click
   useEffect(() => {
@@ -150,6 +152,54 @@ export function TopBar({ onBack, currentView = "editor", onNavigate }: TopBarPro
                   >
                     Exportar projeto como TXT
                   </button>
+
+                  <div className="h-px bg-border my-1" />
+
+                  <div className="px-3 py-1.5 text-[10px] text-ink-tertiary uppercase tracking-wider font-medium">
+                    Backup
+                  </div>
+                  <button
+                    onClick={async () => {
+                      const data = await createBackup()
+                      downloadBackup(data)
+                      setShowExport(false)
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-ink-secondary hover:text-ink-primary hover:bg-chrome rounded-lg transition-colors text-left"
+                  >
+                    Exportar backup (.json)
+                  </button>
+                  <button
+                    onClick={() => {
+                      backupInputRef.current?.click()
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-ink-secondary hover:text-ink-primary hover:bg-chrome rounded-lg transition-colors text-left"
+                  >
+                    Importar backup
+                  </button>
+                  <input
+                    ref={backupInputRef}
+                    type="file"
+                    accept=".json"
+                    className="hidden"
+                    aria-hidden="true"
+                    tabIndex={-1}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+                      try {
+                        const text = await file.text()
+                        const data = parseBackupFile(text)
+                        await restoreBackup(data)
+                        alert("Backup restaurado com sucesso! A página será recarregada.")
+                        window.location.reload()
+                      } catch (err) {
+                        alert(err instanceof Error ? err.message : "Erro ao restaurar backup.")
+                      } finally {
+                        e.target.value = ""
+                        setShowExport(false)
+                      }
+                    }}
+                  />
                 </div>
               )}
             </div>

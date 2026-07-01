@@ -87,7 +87,7 @@ export function ToolbarColors({ editor, type, onClose }: ToolbarColorsProps) {
           initial={prefersReducedMotion ? undefined : { opacity: 0, scale: 0.95, y: 4 }}
           animate={prefersReducedMotion ? undefined : { opacity: 1, scale: 1, y: 0 }}
           exit={prefersReducedMotion ? undefined : { opacity: 0, scale: 0.95 }}
-          transition={prefersReducedMotion ? undefined : { duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+          transition={prefersReducedMotion ? undefined : { duration: 0.15, ease: [0.16, 1, 0.3, 1] as const }}
           role="listbox"
           aria-label={type === "text" ? "Text color" : "Highlight color"}
           className="absolute bottom-full mb-3 right-0 p-2.5 bg-[#1a1a1a]/95 backdrop-blur-2xl border border-white/[0.06] rounded-xl shadow-2xl shadow-black/50 z-50"

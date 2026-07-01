@@ -1,6 +1,6 @@
 import { create } from "zustand"
 import type { Scene } from "@/types"
-import { db, saveScene, getScene } from "@/db"
+import { saveScene, getScene } from "@/db"
 
 export type SaveStatus = "saved" | "saving" | "unsaved"
 

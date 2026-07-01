@@ -10,4 +10,15 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (id.includes("@tiptap/")) return "tiptap"
+          if (id.includes("@dnd-kit/")) return "dnd"
+          if (id.includes("lucide-react")) return "lucide"
+        },
+      },
+    },
+  },
 })

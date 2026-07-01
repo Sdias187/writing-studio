@@ -52,10 +52,6 @@ function promptForUrl(): string | null {
   return window.prompt("Enter URL:")
 }
 
-function promptForImageUrl(): string | null {
-  return window.prompt("Enter image URL:")
-}
-
 export const primaryGroups: ToolbarGroupDef[] = [
   {
     id: "undo-redo",
@@ -216,6 +212,16 @@ export const primaryGroups: ToolbarGroupDef[] = [
         },
         isActive: (editor) => editor.isActive("link"),
       },
+      {
+        id: "image",
+        icon: Image,
+        label: "Image",
+        ariaLabel: "Insert Image",
+        tooltip: "Image",
+        action: (_editor) => {}, // overridden in FloatingToolbar to open file picker
+        isActive: () => false,
+        isDisabled: (editor) => !editor.can().setImage?.({ src: "" }),
+      },
     ],
   },
 ]
@@ -267,20 +273,6 @@ export const overflowGroups: ToolbarGroupDef[] = [
     id: "insert",
     label: "Insert",
     buttons: [
-      {
-        id: "image",
-        icon: Image,
-        label: "Image",
-        ariaLabel: "Insert Image",
-        tooltip: "Image",
-        action: (editor) => {
-          const url = promptForImageUrl()
-          if (!url) return
-          editor.chain().focus().setImage({ src: url }).run()
-        },
-        isActive: () => false,
-        isDisabled: (editor) => !editor.can().setImage?.({ src: "" }),
-      },
       {
         id: "table",
         icon: Table,
@@ -368,7 +360,7 @@ export const overflowGroups: ToolbarGroupDef[] = [
         label: "Focus Mode",
         ariaLabel: "Toggle Focus Mode",
         tooltip: "Focus Mode",
-        action: (editor) => {
+        action: (_editor) => {
           // Dispatch a custom event that editor.tsx listens for
           window.dispatchEvent(new CustomEvent("toggle-focus-mode"))
         },

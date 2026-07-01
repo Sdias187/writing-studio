@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react"
 import { useProjectStore } from "@/stores/project-store"
-import { FileText, Plus, Trash2, ChevronRight, ChevronDown, Users, MapPin, StickyNote } from "lucide-react"
+import { FileText, Plus, Trash2, ChevronRight, ChevronDown, Users, MapPin, StickyNote, GripVertical } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { db, deleteChapter as dbDeleteChapter } from "@/db"
 import type { Scene } from "@/types"
 import type { ProjectView } from "@/App"
+import { DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core"
+import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
+import { reorderItems } from "@/db"
 
 interface SidebarProps {
   onSelectScene: (sceneId: string) => void
@@ -18,6 +22,49 @@ const navItems: { view: ProjectView; label: string; icon: typeof Users }[] = [
   { view: "locations", label: "Locais", icon: MapPin },
   { view: "notes", label: "Notas", icon: StickyNote },
 ]
+
+interface SortableSceneItemProps {
+  scene: Scene
+  isActive: boolean
+  onSelect: (id: string) => void
+}
+
+function SortableSceneItem({ scene, isActive, onSelect }: SortableSceneItemProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: scene.id,
+  })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 10 : undefined,
+    opacity: isDragging ? 0.7 : undefined,
+  }
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-center gap-0.5 group">
+      <button
+        className={`w-full flex items-center gap-2 px-2 py-1 rounded-lg text-left transition-colors ${
+          isActive
+            ? "bg-accent-subtle text-accent"
+            : "text-ink-tertiary hover:text-ink-secondary hover:bg-chrome"
+        }`}
+        onClick={() => onSelect(scene.id)}
+      >
+        <span
+          {...attributes}
+          {...listeners}
+          className="shrink-0 cursor-grab active:cursor-grabbing text-ink-tertiary/30 hover:text-ink-tertiary/60 transition-colors rounded p-0.5 -ml-0.5"
+          aria-label="Arrastar para reordenar"
+        >
+          <GripVertical size={11} />
+        </span>
+        <span className="text-xs truncate flex-1">{scene.title}</span>
+        <span className="text-[10px] tabular-nums opacity-60">{scene.wordCount}w</span>
+      </button>
+    </div>
+  )
+}
 
 export function Sidebar({ onSelectScene, activeSceneId, currentView, onNavigate }: SidebarProps) {
   const { currentProject, chapters, loadChapters, createChapter } = useProjectStore()
@@ -75,6 +122,43 @@ export function Sidebar({ onSelectScene, activeSceneId, currentView, onNavigate 
     const updated = await db.scenes.where("chapterId").equals(chapterId).sortBy("order")
     setChapterScenes((prev) => ({ ...prev, [chapterId]: updated }))
     onSelectScene(scene.id)
+  }
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    })
+  )
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    // Find the chapter containing these scenes
+    const chapterId = Object.entries(chapterScenes).find(([, scenes]) =>
+      scenes.some((s) => s.id === active.id)
+    )?.[0]
+    if (!chapterId) return
+
+    const scenes = chapterScenes[chapterId]
+    const oldIndex = scenes.findIndex((s) => s.id === active.id)
+    const newIndex = scenes.findIndex((s) => s.id === over.id)
+    if (oldIndex === -1 || newIndex === -1) return
+
+    // Reorder the array
+    const reordered = [...scenes]
+    const [moved] = reordered.splice(oldIndex, 1)
+    reordered.splice(newIndex, 0, moved)
+
+    // Update local state
+    const updated = reordered.map((s, i) => ({ ...s, order: i }))
+    setChapterScenes((prev) => ({ ...prev, [chapterId]: updated }))
+
+    // Persist to IndexedDB
+    await reorderItems(
+      db.scenes,
+      updated.map((s) => ({ id: s.id, order: s.order }))
+    )
   }
 
   if (!currentProject) return null
@@ -149,6 +233,7 @@ export function Sidebar({ onSelectScene, activeSceneId, currentView, onNavigate 
             </div>
           )}
 
+          <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
           <div className="space-y-0.5">
             {chapters.map((chapter) => (
               <div key={chapter.id}>
@@ -184,20 +269,19 @@ export function Sidebar({ onSelectScene, activeSceneId, currentView, onNavigate 
 
                 {expandedChapters.has(chapter.id) && (
                   <div className="ml-6 space-y-0.5 mt-0.5 mb-1">
-                    {(chapterScenes[chapter.id] ?? []).map((scene) => (
-                      <button
-                        key={scene.id}
-                        onClick={() => onSelectScene(scene.id)}
-                        className={`w-full flex items-center gap-2 px-2 py-1 rounded-lg text-left transition-colors ${
-                          activeSceneId === scene.id
-                            ? "bg-accent-subtle text-accent"
-                            : "text-ink-tertiary hover:text-ink-secondary hover:bg-chrome"
-                        }`}
-                      >
-                        <span className="text-xs truncate flex-1">{scene.title}</span>
-                        <span className="text-[10px] tabular-nums opacity-60">{scene.wordCount}w</span>
-                      </button>
-                    ))}
+                    <SortableContext
+                      items={(chapterScenes[chapter.id] ?? []).map((s) => s.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {(chapterScenes[chapter.id] ?? []).map((scene) => (
+                        <SortableSceneItem
+                          key={scene.id}
+                          scene={scene}
+                          isActive={activeSceneId === scene.id}
+                          onSelect={onSelectScene}
+                        />
+                      ))}
+                    </SortableContext>
                     {(chapterScenes[chapter.id] ?? []).length === 0 && (
                       <p className="text-xs text-ink-tertiary px-2 py-1 italic">Nenhuma cena</p>
                     )}
@@ -206,6 +290,7 @@ export function Sidebar({ onSelectScene, activeSceneId, currentView, onNavigate 
               </div>
             ))}
           </div>
+          </DndContext>
 
           {chapters.length === 0 && (
             <div className="text-center py-6 px-4">

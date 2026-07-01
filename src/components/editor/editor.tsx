@@ -4,8 +4,20 @@ import StarterKit from "@tiptap/starter-kit"
 import Underline from "@tiptap/extension-underline"
 import Placeholder from "@tiptap/extension-placeholder"
 import LinkExtension from "@tiptap/extension-link"
+import TaskList from "@tiptap/extension-task-list"
+import TaskItem from "@tiptap/extension-task-item"
+import TextAlign from "@tiptap/extension-text-align"
+import Color from "@tiptap/extension-color"
+import TextStyle from "@tiptap/extension-text-style"
+import Highlight from "@tiptap/extension-highlight"
+import Table from "@tiptap/extension-table"
+import TableRow from "@tiptap/extension-table-row"
+import TableCell from "@tiptap/extension-table-cell"
+import TableHeader from "@tiptap/extension-table-header"
+import ImageExtension from "@tiptap/extension-image"
 import { BubbleMenu } from "./bubble-menu"
 import { SlashMenu } from "./slash-menu"
+import { FloatingToolbar } from "./floating-toolbar/floating-toolbar"
 import { useEditorStore } from "@/stores/editor-store"
 import { wordCount } from "@/lib/utils"
 
@@ -27,6 +39,28 @@ export function Editor() {
         heading: { levels: [1, 2, 3] },
       }),
       Underline,
+      TextStyle,
+      Color,
+      TaskList,
+      TaskItem.configure({
+        nested: true,
+      }),
+      TextAlign.configure({
+        types: ["heading", "paragraph"],
+      }),
+      Highlight.configure({
+        multicolor: true,
+      }),
+      Table.configure({
+        resizable: true,
+      }),
+      TableRow,
+      TableCell,
+      TableHeader,
+      ImageExtension.configure({
+        inline: false,
+        allowBase64: false,
+      }),
       Placeholder.configure({
         placeholder: "Comece a escrever...",
       }),
@@ -48,7 +82,6 @@ export function Editor() {
       useEditorStore.getState().autoSave()
     },
     onCreate: ({ editor: ed }) => {
-      // count words for initial content
       const html = ed.getHTML()
       setWordCount(wordCount(html))
     },
@@ -72,7 +105,7 @@ export function Editor() {
     }
   }, [activeScene?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts + custom events
   useEffect(() => {
     if (!editor) return
 
@@ -84,14 +117,23 @@ export function Editor() {
       }
     }
 
+    const handleToggleFocus = () => {
+      setFocusMode(!isFocusMode)
+    }
+
     document.addEventListener("keydown", handleKeyDown)
-    return () => document.removeEventListener("keydown", handleKeyDown)
+    window.addEventListener("toggle-focus-mode", handleToggleFocus)
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown)
+      window.removeEventListener("toggle-focus-mode", handleToggleFocus)
+    }
   }, [editor, isFocusMode, setFocusMode])
 
   return (
-    <div className={`relative transition-all duration-300 ${isFocusMode ? "max-w-3xl mx-auto" : ""}`}>
+    <div className={`relative transition-all duration-300 pb-24 ${isFocusMode ? "max-w-3xl mx-auto" : ""}`}>
       {editor && <BubbleMenu editor={editor} />}
       {editor && <SlashMenu editor={editor} />}
+      {editor && <FloatingToolbar editor={editor} />}
       <EditorContent editor={editor} />
     </div>
   )

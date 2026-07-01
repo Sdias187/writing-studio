@@ -1,7 +1,9 @@
-import { ArrowLeft } from "lucide-react"
-import { IconButton, Button } from "@/components/ui/button"
+import { useState, useRef, useEffect } from "react"
+import { ArrowLeft, Download } from "lucide-react"
+import { IconButton } from "@/components/ui/button"
 import { useEditorStore } from "@/stores/editor-store"
 import { useProjectStore } from "@/stores/project-store"
+import { exportSceneAsMarkdown, exportSceneAsTxt, exportProjectAsMarkdown, exportProjectAsTxt } from "@/lib/export"
 import type { ProjectView } from "@/App"
 
 const statusLabel = {
@@ -20,6 +22,7 @@ const viewTitles: Record<ProjectView, string> = {
   editor: "Editor",
   characters: "Personagens",
   locations: "Locais",
+  notes: "Notas",
 }
 
 interface TopBarProps {
@@ -29,8 +32,22 @@ interface TopBarProps {
 }
 
 export function TopBar({ onBack, currentView = "editor", onNavigate }: TopBarProps) {
-  const { saveStatus, wordCount, isFocusMode, setFocusMode, editor } = useEditorStore()
+  const { saveStatus, wordCount, isFocusMode, setFocusMode, editor, activeScene, content, save } = useEditorStore()
   const { currentProject } = useProjectStore()
+  const [showExport, setShowExport] = useState(false)
+  const exportRef = useRef<HTMLDivElement>(null)
+
+  // Close export dropdown on outside click
+  useEffect(() => {
+    if (!showExport) return
+    const handleClick = (e: MouseEvent) => {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
+        setShowExport(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClick)
+    return () => document.removeEventListener("mousedown", handleClick)
+  }, [showExport])
 
   if (isFocusMode) {
     return (
@@ -73,6 +90,70 @@ export function TopBar({ onBack, currentView = "editor", onNavigate }: TopBarPro
               {statusLabel[saveStatus]}
             </span>
             <div className="w-px h-5 bg-border mx-1" />
+
+            {/* Export dropdown */}
+            <div ref={exportRef} className="relative">
+              <IconButton onClick={() => setShowExport(!showExport)} title="Exportar">
+                <Download size={15} />
+              </IconButton>
+
+              {showExport && (
+                <div className="absolute right-0 top-full mt-1 min-w-[220px] bg-elevated border border-border rounded-xl p-1 z-50">
+                  <div className="px-3 py-1.5 text-[10px] text-ink-tertiary uppercase tracking-wider font-medium">
+                    Cena atual
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (activeScene) exportSceneAsMarkdown({ ...activeScene, content: content ?? activeScene.content })
+                      setShowExport(false)
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-ink-secondary hover:text-ink-primary hover:bg-chrome rounded-lg transition-colors text-left"
+                  >
+                    Exportar como Markdown
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (activeScene) exportSceneAsTxt({ ...activeScene, content: content ?? activeScene.content })
+                      setShowExport(false)
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-ink-secondary hover:text-ink-primary hover:bg-chrome rounded-lg transition-colors text-left"
+                  >
+                    Exportar como TXT
+                  </button>
+
+                  <div className="h-px bg-border my-1" />
+
+                  <div className="px-3 py-1.5 text-[10px] text-ink-tertiary uppercase tracking-wider font-medium">
+                    Projeto
+                  </div>
+                  <button
+                    onClick={async () => {
+                      if (currentProject) {
+                        await save()
+                        await exportProjectAsMarkdown(currentProject.id, currentProject.title)
+                      }
+                      setShowExport(false)
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-ink-secondary hover:text-ink-primary hover:bg-chrome rounded-lg transition-colors text-left"
+                  >
+                    Exportar projeto como Markdown
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (currentProject) {
+                        await save()
+                        await exportProjectAsTxt(currentProject.id, currentProject.title)
+                      }
+                      setShowExport(false)
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-ink-secondary hover:text-ink-primary hover:bg-chrome rounded-lg transition-colors text-left"
+                  >
+                    Exportar projeto como TXT
+                  </button>
+                </div>
+              )}
+            </div>
+
             <IconButton onClick={() => setFocusMode(true)} title="Modo foco (Ctrl+Shift+F)">
               <span className="text-xs">⛶</span>
             </IconButton>

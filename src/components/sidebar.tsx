@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useProjectStore } from "@/stores/project-store"
-import { FileText, Plus, Trash2, ChevronRight, ChevronDown, Users, MapPin } from "lucide-react"
+import { FileText, Plus, Trash2, ChevronRight, ChevronDown, Users, MapPin, StickyNote } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { db, deleteChapter as dbDeleteChapter } from "@/db"
 import type { Scene } from "@/types"
@@ -16,6 +16,7 @@ interface SidebarProps {
 const navItems: { view: ProjectView; label: string; icon: typeof Users }[] = [
   { view: "characters", label: "Personagens", icon: Users },
   { view: "locations", label: "Locais", icon: MapPin },
+  { view: "notes", label: "Notas", icon: StickyNote },
 ]
 
 export function Sidebar({ onSelectScene, activeSceneId, currentView, onNavigate }: SidebarProps) {

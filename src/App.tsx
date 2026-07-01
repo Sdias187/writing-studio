@@ -3,6 +3,7 @@ import { Dashboard } from "@/pages/dashboard"
 import { Editor } from "@/components/editor/editor"
 import { CharactersPage } from "@/pages/characters"
 import { LocationsPage } from "@/pages/locations"
+import { NotesPage } from "@/pages/notes"
 import { TopBar } from "@/components/top-bar"
 import { Sidebar } from "@/components/sidebar"
 import { AppShell } from "@/components/app-shell"
@@ -10,7 +11,7 @@ import { useProjectStore } from "@/stores/project-store"
 import { useEditorStore } from "@/stores/editor-store"
 import { db } from "@/db"
 
-export type ProjectView = "editor" | "characters" | "locations"
+export type ProjectView = "editor" | "characters" | "locations" | "notes"
 
 function App() {
   const [view, setView] = useState<"dashboard" | ProjectView>("dashboard")
@@ -72,6 +73,8 @@ function App() {
         return <CharactersPage />
       case "locations":
         return <LocationsPage />
+      case "notes":
+        return <NotesPage />
       default:
         return <Editor />
     }

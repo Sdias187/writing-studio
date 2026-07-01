@@ -71,24 +71,27 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   save: async () => {
-    const { activeSceneId, content, title, wordCount } = get()
+    const { activeSceneId, content, title, wordCount, activeScene } = get()
     if (!activeSceneId || !content) return
 
     set({ saveStatus: "saving" })
 
-    await saveScene({
+    const now = new Date().toISOString()
+    const updatedScene: Scene = {
       id: activeSceneId,
-      chapterId: get().activeScene?.chapterId ?? "",
-      projectId: get().activeScene?.projectId ?? "",
+      chapterId: activeScene?.chapterId ?? "",
+      projectId: activeScene?.projectId ?? "",
       title,
       content,
       wordCount,
-      order: get().activeScene?.order ?? 0,
-      createdAt: get().activeScene?.createdAt ?? new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    })
+      order: activeScene?.order ?? 0,
+      createdAt: activeScene?.createdAt ?? now,
+      updatedAt: now,
+    }
 
-    set({ saveStatus: "saved" })
+    await saveScene(updatedScene)
+
+    set({ saveStatus: "saved", activeScene: updatedScene })
   },
 
   autoSave: async () => {

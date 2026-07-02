@@ -1,6 +1,8 @@
 import { create } from "zustand"
 import type { HeadingInfo } from "@/types"
 
+export type SearchResult = { from: number; to: number }
+
 export type SaveStatus = "saved" | "saving" | "unsaved"
 
 interface EditorState {
@@ -19,6 +21,16 @@ interface EditorState {
   setHeadings: (headings: HeadingInfo[]) => void
   setActiveHeading: (text: string) => void
 
+  searchOpen: boolean
+  searchQuery: string
+  searchResults: SearchResult[]
+  searchIndex: number
+
+  setSearchOpen: (open: boolean) => void
+  setSearchQuery: (query: string) => void
+  setSearchResults: (results: SearchResult[], index: number) => void
+  setSearchIndex: (index: number) => void
+
   save: () => Promise<void>
   autoSave: () => Promise<void>
 }
@@ -33,6 +45,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   editor: null,
   headings: [],
   activeHeading: "",
+  searchOpen: false,
+  searchQuery: "",
+  searchResults: [],
+  searchIndex: 0,
 
   setContent: (content: object) => {
     set({ content, saveStatus: "unsaved" })
@@ -56,6 +72,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   setActiveHeading: (text: string) => {
     set({ activeHeading: text })
+  },
+
+  setSearchOpen: (open: boolean) => {
+    set({ searchOpen: open })
+    if (!open) {
+      set({ searchQuery: "", searchResults: [], searchIndex: 0 })
+    }
+  },
+
+  setSearchQuery: (query: string) => {
+    set({ searchQuery: query })
+  },
+
+  setSearchResults: (results: SearchResult[], index: number) => {
+    set({ searchResults: results, searchIndex: index })
+  },
+
+  setSearchIndex: (index: number) => {
+    set({ searchIndex: index })
   },
 
   save: async () => {

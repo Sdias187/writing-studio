@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react"
 import { useEditor, EditorContent } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
+import { Extension } from "@tiptap/core"
 import Underline from "@tiptap/extension-underline"
 import Placeholder from "@tiptap/extension-placeholder"
 import LinkExtension from "@tiptap/extension-link"
@@ -20,11 +21,31 @@ import { common, createLowlight } from "lowlight"
 import { BubbleMenu } from "./bubble-menu"
 import { SlashMenu } from "./slash-menu"
 import { FloatingToolbar } from "./floating-toolbar/floating-toolbar"
+import { SearchPanel } from "./search-panel"
+import { searchPlugin } from "./search-plugin"
+import { Minimap } from "./minimap"
 import { useEditorStore } from "@/stores/editor-store"
 import { useProjectStore } from "@/stores/project-store"
 import { wordCount, parseHeadings } from "@/lib/utils"
+import { clearSearchDecorations } from "./search-plugin"
 
 const lowlight = createLowlight(common)
+
+function navigateHeading(direction: "next" | "prev", editor: any) {
+  const { headings } = useEditorStore.getState()
+  if (headings.length === 0) return
+  const currentPos = editor.state.selection.from
+
+  if (direction === "next") {
+    const next = headings.find((h) => h.pos > currentPos) ?? headings[0]
+    editor.commands.setTextSelection({ from: next.pos, to: next.pos })
+    editor.commands.scrollIntoView()
+  } else {
+    const prev = [...headings].reverse().find((h) => h.pos < currentPos) ?? headings[headings.length - 1]
+    editor.commands.setTextSelection({ from: prev.pos, to: prev.pos })
+    editor.commands.scrollIntoView()
+  }
+}
 
 export function Editor() {
   const contentRef = useRef<object | null>(null)
@@ -34,6 +55,8 @@ export function Editor() {
   const setHeadings = useEditorStore((s) => s.setHeadings)
   const setFocusMode = useEditorStore((s) => s.setFocusMode)
   const setActiveHeading = useEditorStore((s) => s.setActiveHeading)
+  const setSearchOpen = useEditorStore((s) => s.setSearchOpen)
+  const searchOpen = useEditorStore((s) => s.searchOpen)
   const headingRef = useEditorStore((s) => s.headings)
   const currentProject = useProjectStore((s) => s.currentProject)
 
@@ -58,6 +81,7 @@ export function Editor() {
       ImageExtension.configure({ inline: false, allowBase64: false }),
       Placeholder.configure({ placeholder: "Comece a escrever..." }),
       LinkExtension.configure({ openOnClick: false }),
+      Extension.create({ addProseMirrorPlugins: () => [searchPlugin] }),
     ],
     content: currentProject?.content ?? undefined,
     editorProps: {
@@ -137,9 +161,34 @@ export function Editor() {
     if (!editor) return
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+Shift+F: toggle focus mode
       if (e.key === "F" && e.ctrlKey && e.shiftKey) {
         e.preventDefault()
         setFocusMode(!isFocusMode)
+      }
+      // Ctrl+F: toggle search
+      if (e.key === "f" && e.ctrlKey && !e.shiftKey) {
+        e.preventDefault()
+        setSearchOpen(!searchOpen)
+        if (searchOpen) {
+          clearSearchDecorations(editor)
+        }
+      }
+      // Ctrl+Shift+↓: next heading
+      if (e.key === "ArrowDown" && e.ctrlKey && e.shiftKey) {
+        e.preventDefault()
+        navigateHeading("next", editor)
+      }
+      // Ctrl+Shift+↑: previous heading
+      if (e.key === "ArrowUp" && e.ctrlKey && e.shiftKey) {
+        e.preventDefault()
+        navigateHeading("prev", editor)
+      }
+      // Escape: close search
+      if (e.key === "Escape" && searchOpen) {
+        e.preventDefault()
+        setSearchOpen(false)
+        clearSearchDecorations(editor)
       }
     }
 
@@ -153,14 +202,28 @@ export function Editor() {
       document.removeEventListener("keydown", handleKeyDown)
       window.removeEventListener("toggle-focus-mode", handleToggleFocus)
     }
-  }, [editor, isFocusMode, setFocusMode])
+  }, [editor, isFocusMode, setFocusMode, searchOpen, setSearchOpen])
 
   return (
     <div className={`relative transition-all duration-300 pb-24 ${isFocusMode ? "max-w-3xl mx-auto" : ""}`}>
-      {editor && <BubbleMenu editor={editor} />}
-      {editor && <SlashMenu editor={editor} />}
+      <div className="flex gap-4">
+        <div className="flex-1 min-w-0 relative">
+          {editor && searchOpen && (
+            <div className="absolute top-0 right-0 z-40">
+              <SearchPanel editor={editor} />
+            </div>
+          )}
+          {editor && <BubbleMenu editor={editor} />}
+          {editor && <SlashMenu editor={editor} />}
+          <EditorContent editor={editor} />
+        </div>
+        {editor && !isFocusMode && (
+          <div className="shrink-0 pt-1">
+            <Minimap editor={editor} />
+          </div>
+        )}
+      </div>
       {editor && <FloatingToolbar editor={editor} />}
-      <EditorContent editor={editor} />
     </div>
   )
 }

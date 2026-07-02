@@ -272,3 +272,15 @@ body {
 .slash-menu-item.is-selected {
   background: var(--color-chrome);
 }
+
+/* ─── Search highlights (ProseMirror decorations) ─── */
+.search-match {
+  background: rgba(231, 197, 154, 0.2);
+  border-bottom: 1px solid rgba(231, 197, 154, 0.4);
+  border-radius: 2px;
+}
+.search-match-active {
+  background: rgba(231, 197, 154, 0.35);
+  border-bottom: 2px solid var(--color-accent);
+  border-radius: 2px;
+}

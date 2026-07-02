@@ -6,3 +6,7 @@ dist
 *.log
 .DS_Store
 /img-repo
+/docs
+.claude/
+__pycache__/
+*.pyc

@@ -63,47 +63,6 @@ export async function deleteProject(id: string): Promise<void> {
   })
 }
 
-export async function getChapters(projectId: string): Promise<Chapter[]> {
-  return db.chapters.where("projectId").equals(projectId).sortBy("order")
-}
-
-export async function saveChapter(chapter: Chapter): Promise<void> {
-  await db.chapters.put(chapter)
-}
-
-export async function deleteChapter(id: string): Promise<void> {
-  await db.transaction("rw", db.chapters, db.scenes, async () => {
-    await db.chapters.delete(id)
-    await db.scenes.where("chapterId").equals(id).delete()
-  })
-}
-
-export async function getScenes(chapterId: string): Promise<Scene[]> {
-  return db.scenes.where("chapterId").equals(chapterId).sortBy("order")
-}
-
-export async function getScene(id: string): Promise<Scene | undefined> {
-  return db.scenes.get(id)
-}
-
-export async function saveScene(scene: Scene): Promise<void> {
-  await db.scenes.put(scene)
-}
-
-export async function deleteScene(id: string): Promise<void> {
-  await db.scenes.delete(id)
-}
-
-export async function reorderItems<T extends { id: string; order: number }>(
-  table: EntityTable<T, "id">,
-  items: { id: string; order: number }[]
-): Promise<void> {
-  await db.transaction("rw", table, async () => {
-    for (const item of items) {
-      await table.update(item.id as any, { order: item.order } as any)
-    }
-  })
-}
 
 // -- Notes --
 

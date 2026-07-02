@@ -3,6 +3,7 @@ import { Dashboard } from "@/pages/dashboard"
 import { TopBar } from "@/components/top-bar"
 import { Sidebar } from "@/components/sidebar"
 import { AppShell } from "@/components/app-shell"
+import { ErrorBoundary } from "@/components/error-boundary"
 import { useProjectStore } from "@/stores/project-store"
 import { db } from "@/db"
 
@@ -56,7 +57,9 @@ function App() {
       sidebar={<Sidebar currentView={view} onNavigate={handleNavigate} />}
     >
       <Suspense fallback={null}>
-        {renderContent()}
+        <ErrorBoundary>
+          {renderContent()}
+        </ErrorBoundary>
       </Suspense>
     </AppShell>
   )

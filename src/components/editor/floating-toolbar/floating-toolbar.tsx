@@ -185,6 +185,10 @@ export function FloatingToolbar({ editor }: FloatingToolbarProps) {
 
   const closeColors = useCallback(() => setColorPickerType(null), [])
 
+  // Look up color button defs by ID instead of hardcoded index
+  const textColorDef = overflowGroups.flatMap(g => g.buttons).find(b => b.id === "text-color")
+  const highlightDef = overflowGroups.flatMap(g => g.buttons).find(b => b.id === "highlight")
+
   const MoreIcon = moreIcon
 
   const animProps = reducedMotion
@@ -239,38 +243,42 @@ export function FloatingToolbar({ editor }: FloatingToolbarProps) {
           {/* Divider before More button */}
           <ToolbarDivider />
 
-          {/* Color buttons (in overflow area but with direct picker) */}
-          <div className="relative">
-            <ToolbarButton
-              editor={editor}
-              def={{
-                id: "text-color",
-                icon: overflowGroups[2].buttons[0].icon,
-                label: "Text Color",
-                ariaLabel: "Text Color",
-                tooltip: "Text Color",
-                action: () => handleColorClick("text"),
-                isActive: overflowGroups[2].buttons[0].isActive,
-              }}
-            />
-            <ToolbarColors editor={editor} type={colorPickerType === "text" ? "text" : null} onClose={closeColors} />
-          </div>
+          {/* Color buttons (looked up by ID instead of hardcoded index) */}
+          {textColorDef && (
+            <div className="relative">
+              <ToolbarButton
+                editor={editor}
+                def={{
+                  id: "text-color",
+                  icon: textColorDef.icon,
+                  label: "Text Color",
+                  ariaLabel: "Text Color",
+                  tooltip: "Text Color",
+                  action: () => handleColorClick("text"),
+                  isActive: textColorDef.isActive,
+                }}
+              />
+              <ToolbarColors editor={editor} type={colorPickerType === "text" ? "text" : null} onClose={closeColors} />
+            </div>
+          )}
 
-          <div className="relative">
-            <ToolbarButton
-              editor={editor}
-              def={{
-                id: "highlight",
-                icon: overflowGroups[2].buttons[1].icon,
-                label: "Highlight",
-                ariaLabel: "Highlight",
-                tooltip: "Highlight",
-                action: () => handleColorClick("highlight"),
-                isActive: overflowGroups[2].buttons[1].isActive,
-              }}
-            />
-            <ToolbarColors editor={editor} type={colorPickerType === "highlight" ? "highlight" : null} onClose={closeColors} />
-          </div>
+          {highlightDef && (
+            <div className="relative">
+              <ToolbarButton
+                editor={editor}
+                def={{
+                  id: "highlight",
+                  icon: highlightDef.icon,
+                  label: "Highlight",
+                  ariaLabel: "Highlight",
+                  tooltip: "Highlight",
+                  action: () => handleColorClick("highlight"),
+                  isActive: highlightDef.isActive,
+                }}
+              />
+              <ToolbarColors editor={editor} type={colorPickerType === "highlight" ? "highlight" : null} onClose={closeColors} />
+            </div>
+          )}
 
           <ToolbarDivider />
 

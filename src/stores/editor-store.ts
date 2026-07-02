@@ -1,4 +1,5 @@
 import { create } from "zustand"
+import type { Editor } from "@tiptap/react"
 import type { HeadingInfo } from "@/types"
 
 export type SearchResult = { from: number; to: number }
@@ -10,13 +11,13 @@ interface EditorState {
   wordCount: number
   saveStatus: SaveStatus
   isFocusMode: boolean
-  editor: any | null
+  editor: Editor | null
   headings: HeadingInfo[]
   activeHeading: string
 
   setContent: (content: object) => void
   setWordCount: (count: number) => void
-  setEditor: (editor: any) => void
+  setEditor: (editor: Editor | null) => void
   setFocusMode: (enabled: boolean) => void
   setHeadings: (headings: HeadingInfo[]) => void
   setActiveHeading: (text: string) => void
@@ -58,7 +59,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ wordCount })
   },
 
-  setEditor: (editor: any) => {
+  setEditor: (editor: Editor | null) => {
     set({ editor })
   },
 
@@ -99,7 +100,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     // Try to get content from editor first (most current), fall back to store
     let json = content
     if (editor?.getJSON) {
-      json = editor.getJSON() as object
+      json = editor.getJSON()
     }
 
     if (!json) return

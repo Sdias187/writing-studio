@@ -11,6 +11,7 @@ export function SearchPanel({ editor }: SearchPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const { setSearchOpen, setSearchResults, searchResults, searchIndex } = useEditorStore()
   const [query, setQuery] = useState("")
+  const [searched, setSearched] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Focus input on open
@@ -23,6 +24,7 @@ export function SearchPanel({ editor }: SearchPanelProps) {
 
   const doSearch = (q: string) => {
     setQuery(q)
+    setSearched(true)
     const matches = findMatches(editor, q)
     setSearchResults(matches, 0)
     updateSearchDecorations(editor, matches, 0)
@@ -78,6 +80,9 @@ export function SearchPanel({ editor }: SearchPanelProps) {
         <span className="text-xs text-ink-tertiary tabular-nums min-w-[6ch] text-right">
           {searchIndex + 1} de {searchResults.length}
         </span>
+      )}
+      {searched && query && searchResults.length === 0 && (
+        <span className="text-xs text-ink-tertiary min-w-[14ch]">Nenhum resultado</span>
       )}
       <button
         onClick={() => goToMatch("prev")}

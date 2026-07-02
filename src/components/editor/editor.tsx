@@ -49,6 +49,7 @@ function navigateHeading(direction: "next" | "prev", editor: any) {
 
 export function Editor() {
   const contentRef = useRef<object | null>(null)
+  const initialLoadDone = useRef(false)
   const isFocusMode = useEditorStore((s) => s.isFocusMode)
   const setEditor = useEditorStore((s) => s.setEditor)
   const setWordCount = useEditorStore((s) => s.setWordCount)
@@ -57,7 +58,6 @@ export function Editor() {
   const setActiveHeading = useEditorStore((s) => s.setActiveHeading)
   const setSearchOpen = useEditorStore((s) => s.setSearchOpen)
   const searchOpen = useEditorStore((s) => s.searchOpen)
-  const headingRef = useEditorStore((s) => s.headings)
   const currentProject = useProjectStore((s) => s.currentProject)
 
   const editor = useEditor({
@@ -116,13 +116,11 @@ export function Editor() {
     }
   }, [editor, setEditor])
 
-  // Load project content into editor if it's empty (handles timing edge case)
+  // Load project content into editor once on mount (handles timing edge case)
   useEffect(() => {
-    if (!editor || !currentProject?.content) return
-    const hasContent = editor.state.doc.textContent.trim().length > 0
-    if (!hasContent) {
-      editor.commands.setContent(currentProject.content)
-    }
+    if (!editor || !currentProject?.content || initialLoadDone.current) return
+    editor.commands.setContent(currentProject.content)
+    initialLoadDone.current = true
   }, [editor, currentProject?.content])
 
   // Scroll tracking for breadcrumb
@@ -132,7 +130,7 @@ export function Editor() {
     if (!editorEl) return
 
     const onScroll = () => {
-      const headings = headingRef
+      const headings = useEditorStore.getState().headings
       if (headings.length === 0) {
         setActiveHeading("")
         return
@@ -162,7 +160,23 @@ export function Editor() {
 
     editorEl.addEventListener("scroll", onScroll, { passive: true })
     return () => editorEl.removeEventListener("scroll", onScroll)
-  }, [editor, headingRef, setActiveHeading])
+  }, [editor, setActiveHeading])
+
+  // Beforeunload: warn if unsaved changes
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      const status = useEditorStore.getState().saveStatus
+      if (status === "unsaved") {
+        e.preventDefault()
+      }
+    }
+    window.addEventListener("beforeunload", onBeforeUnload)
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload)
+      // Save any pending content on unmount
+      useEditorStore.getState().save()
+    }
+  }, [])
 
   // Keyboard shortcuts
   useEffect(() => {

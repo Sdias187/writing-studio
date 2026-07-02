@@ -27,6 +27,21 @@ function scrollToHeading(pos: number) {
   editor.commands.scrollIntoView()
 }
 
+function scrollToHeadingSafe(pos: number) {
+  const editor = useEditorStore.getState().editor
+  if (editor) {
+    scrollToHeading(pos)
+    return
+  }
+  // Editor not ready yet — wait for it
+  const unsub = useEditorStore.subscribe((state, prev) => {
+    if (state.editor && !prev.editor) {
+      scrollToHeading(pos)
+      unsub()
+    }
+  })
+}
+
 function insertChapterHeadline() {
   const editor = useEditorStore.getState().editor
   if (!editor) return
@@ -97,8 +112,7 @@ export function Sidebar({ currentView, onNavigate }: SidebarProps) {
         {tocGroups.map((group) => {
           const navigateToChapter = () => {
             navigateToEditor(onNavigate)
-            // Small timeout to let editor mount before scrolling
-            setTimeout(() => scrollToHeading(group.chapter.pos), 100)
+            scrollToHeadingSafe(group.chapter.pos)
           }
           const chapterId = group.chapter.text + group.chapter.pos
           const synopsis = currentProject?.chapterSynopses[chapterId] ?? ""
@@ -132,7 +146,7 @@ export function Sidebar({ currentView, onNavigate }: SidebarProps) {
                         key={sub.text + sub.pos}
                         onClick={() => {
                           navigateToEditor(onNavigate)
-                          setTimeout(() => scrollToHeading(sub.pos), 100)
+                          scrollToHeadingSafe(sub.pos)
                         }}
                         className="w-full flex items-center gap-2 px-2 py-1 rounded-md text-left transition-colors text-xs text-ink-tertiary hover:text-ink-secondary hover:bg-chrome-hover"
                       >

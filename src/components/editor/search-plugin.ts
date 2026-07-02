@@ -12,17 +12,23 @@ export interface SearchMatch {
 export function findMatches(editor: Editor, query: string): SearchMatch[] {
   if (!query.trim()) return []
   const doc = editor.state.doc
-  const text = doc.textBetween(0, doc.content.size, "\n", "\n")
   const matches: SearchMatch[] = []
   const lower = query.toLowerCase()
-  let idx = 0
 
-  while (idx < text.length) {
-    const found = text.toLowerCase().indexOf(lower, idx)
-    if (found === -1) break
-    matches.push({ from: found, to: found + query.length })
-    idx = found + 1
-  }
+  doc.descendants((node, pos) => {
+    if (node.isText) {
+      const text = node.text ?? ""
+      const textLower = text.toLowerCase()
+      let idx = 0
+      while (idx < text.length) {
+        const found = textLower.indexOf(lower, idx)
+        if (found === -1) break
+        matches.push({ from: pos + found, to: pos + found + query.length })
+        idx = found + 1
+      }
+    }
+    return true
+  })
 
   return matches
 }

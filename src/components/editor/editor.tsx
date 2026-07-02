@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useMemo } from "react"
+import { createPortal } from "react-dom"
 import { useEditor, EditorContent } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
 import { Extension } from "@tiptap/core"
@@ -23,7 +24,6 @@ import { SlashMenu } from "./slash-menu"
 import { FloatingToolbar } from "./floating-toolbar/floating-toolbar"
 import { SearchPanel } from "./search-panel"
 import { searchPlugin } from "./search-plugin"
-import { Minimap } from "./minimap"
 import { useEditorStore } from "@/stores/editor-store"
 import { useProjectStore } from "@/stores/project-store"
 import { wordCount, parseHeadings } from "@/lib/utils"
@@ -112,10 +112,18 @@ export function Editor() {
       setEditor(editor)
     }
     return () => {
-      // Clean up on unmount
       setEditor(null)
     }
   }, [editor, setEditor])
+
+  // Load project content into editor if it's empty (handles timing edge case)
+  useEffect(() => {
+    if (!editor || !currentProject?.content) return
+    const hasContent = editor.state.doc.textContent.trim().length > 0
+    if (!hasContent) {
+      editor.commands.setContent(currentProject.content)
+    }
+  }, [editor, currentProject?.content])
 
   // Scroll tracking for breadcrumb
   useEffect(() => {
@@ -204,26 +212,27 @@ export function Editor() {
     }
   }, [editor, isFocusMode, setFocusMode, searchOpen, setSearchOpen])
 
+  const searchPanel = useMemo(() => {
+    if (!editor || !searchOpen) return null
+    return createPortal(
+      <div className="fixed top-14 right-4 z-[100]">
+        <SearchPanel editor={editor} />
+      </div>,
+      document.body
+    )
+  }, [editor, searchOpen])
+
   return (
+    <>
+      {searchPanel}
     <div className={`relative transition-all duration-300 pb-24 ${isFocusMode ? "max-w-3xl mx-auto" : ""}`}>
-      <div className="flex gap-4">
-        <div className="flex-1 min-w-0 relative">
-          {editor && searchOpen && (
-            <div className="absolute top-0 right-0 z-40">
-              <SearchPanel editor={editor} />
-            </div>
-          )}
+      <div className="relative">
           {editor && <BubbleMenu editor={editor} />}
           {editor && <SlashMenu editor={editor} />}
           <EditorContent editor={editor} />
-        </div>
-        {editor && !isFocusMode && (
-          <div className="shrink-0 pt-1">
-            <Minimap editor={editor} />
-          </div>
-        )}
       </div>
       {editor && <FloatingToolbar editor={editor} />}
     </div>
+    </>
   )
 }

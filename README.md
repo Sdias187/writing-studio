@@ -324,5 +324,3 @@ Distribuido sob a licenca MIT. Veja o arquivo `LICENSE` para mais informacoes.
 ## Autor
 
 **Vinicius Dias** -- Designer e desenvolvedor.
-
-Projeto: [Hyperstudio](https://hyperstudio.com.br)

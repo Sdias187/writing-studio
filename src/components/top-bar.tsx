@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from "react"
-import { ArrowLeft, Download } from "lucide-react"
+import { ArrowLeft, Download, LogOut } from "lucide-react"
 import { IconButton } from "@/components/ui/button"
 import { useEditorStore } from "@/stores/editor-store"
 import { useProjectStore } from "@/stores/project-store"
+import { useAuthStore } from "@/stores/auth-store"
 import { exportProjectAsMarkdown, exportProjectAsTxt } from "@/lib/export"
 import { createBackup, downloadBackup, parseBackupFile, restoreBackup } from "@/lib/backup"
 import type { ProjectView } from "@/App"
@@ -187,6 +188,13 @@ export function TopBar({ onBack, currentView = "editor", onNavigate: _onNavigate
             </IconButton>
           </>
         )}
+        <div className="w-px h-5 bg-border mx-1" />
+        <IconButton
+          onClick={() => useAuthStore.getState().signOut()}
+          title="Sair"
+        >
+          <LogOut size={15} />
+        </IconButton>
       </div>
     </header>
   )

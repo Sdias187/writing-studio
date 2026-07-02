@@ -4,7 +4,7 @@
 **Azoth** e um editor de texto local-first para escrita criativa (romances, contos, roteiros). Construido com React 19, TipTap e IndexedDB, ele oferece um ambiente de escrita rico e com funcionamento offline -- seus dados nunca saem do navegador a menos que voce exporte.
 
 <p align="center">
-  <img src="./img-repo/screenshot.png" alt="Azoth Editor Screenshot" width="700" />
+  <img src="./img-repo/Screenshot.png" alt="Azoth Editor Screenshot" width="700" />
 </p>
 
 ---

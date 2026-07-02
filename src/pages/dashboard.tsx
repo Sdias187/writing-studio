@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react"
 import { useProjectStore } from "@/stores/project-store"
-import { BookOpen, Plus, PenLine, Trash2, FileText } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { BookOpen, Plus, PenLine, Trash2, FileText, LogOut } from "lucide-react"
+import { Button, IconButton } from "@/components/ui/button"
+import { useAuthStore } from "@/stores/auth-store"
 
 interface DashboardProps {
   onSelectProject: (projectId: string) => void
@@ -39,9 +40,17 @@ export function Dashboard({ onSelectProject }: DashboardProps) {
           <PenLine size={18} className="text-accent" />
           <h1 className="text-base font-semibold text-ink-primary">Azoth</h1>
         </div>
-        <Button onClick={() => setShowNew(true)}>
-          <Plus size={15} className="mr-1.5" /> Novo projeto
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={() => setShowNew(true)}>
+            <Plus size={15} className="mr-1.5" /> Novo projeto
+          </Button>
+          <IconButton
+            onClick={() => useAuthStore.getState().signOut()}
+            title="Sair"
+          >
+            <LogOut size={15} />
+          </IconButton>
+        </div>
       </header>
 
       <main className="flex-1 max-w-4xl mx-auto w-full px-6 py-10">

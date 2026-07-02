@@ -1,4 +1,4 @@
-import { useEffect } from "react"
+import { useEffect, useRef } from "react"
 import { useEditor, EditorContent } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
 import Underline from "@tiptap/extension-underline"
@@ -21,21 +21,21 @@ import { BubbleMenu } from "./bubble-menu"
 import { SlashMenu } from "./slash-menu"
 import { FloatingToolbar } from "./floating-toolbar/floating-toolbar"
 import { useEditorStore } from "@/stores/editor-store"
-import { wordCount } from "@/lib/utils"
+import { useProjectStore } from "@/stores/project-store"
+import { wordCount, parseHeadings } from "@/lib/utils"
 
 const lowlight = createLowlight(common)
 
 export function Editor() {
-  const {
-    activeScene,
-    content,
-    setContent,
-    setEditor,
-    setWordCount,
-    setFocusMode,
-    isFocusMode,
-    editor: storedEditor,
-  } = useEditorStore()
+  const contentRef = useRef<object | null>(null)
+  const isFocusMode = useEditorStore((s) => s.isFocusMode)
+  const setEditor = useEditorStore((s) => s.setEditor)
+  const setWordCount = useEditorStore((s) => s.setWordCount)
+  const setHeadings = useEditorStore((s) => s.setHeadings)
+  const setFocusMode = useEditorStore((s) => s.setFocusMode)
+  const setActiveHeading = useEditorStore((s) => s.setActiveHeading)
+  const headingRef = useEditorStore((s) => s.headings)
+  const currentProject = useProjectStore((s) => s.currentProject)
 
   const editor = useEditor({
     extensions: [
@@ -48,75 +48,95 @@ export function Editor() {
       TextStyle,
       Color,
       TaskList,
-      TaskItem.configure({
-        nested: true,
-      }),
-      TextAlign.configure({
-        types: ["heading", "paragraph"],
-      }),
-      Highlight.configure({
-        multicolor: true,
-      }),
-      Table.configure({
-        resizable: true,
-      }),
+      TaskItem.configure({ nested: true }),
+      TextAlign.configure({ types: ["heading", "paragraph"] }),
+      Highlight.configure({ multicolor: true }),
+      Table.configure({ resizable: true }),
       TableRow,
       TableCell,
       TableHeader,
-      ImageExtension.configure({
-        inline: false,
-        allowBase64: false,
-      }),
-      Placeholder.configure({
-        placeholder: "Comece a escrever...",
-      }),
-      LinkExtension.configure({
-        openOnClick: false,
-      }),
+      ImageExtension.configure({ inline: false, allowBase64: false }),
+      Placeholder.configure({ placeholder: "Comece a escrever..." }),
+      LinkExtension.configure({ openOnClick: false }),
     ],
-    content: content ?? undefined,
+    content: currentProject?.content ?? undefined,
     editorProps: {
-      attributes: {
-        class: "tiptap-editor",
-      },
+      attributes: { class: "tiptap-editor" },
     },
     onUpdate: ({ editor: ed }) => {
       const html = ed.getHTML()
       const json = ed.getJSON()
-      setContent(json as object)
+      contentRef.current = json as object
+
       setWordCount(wordCount(html))
+      setHeadings(parseHeadings(json))
       useEditorStore.getState().autoSave()
     },
     onCreate: ({ editor: ed }) => {
       const html = ed.getHTML()
+      const json = ed.getJSON()
+      contentRef.current = json as object
+
       setWordCount(wordCount(html))
+      setHeadings(parseHeadings(json))
     },
   })
 
-  // Sync editor to store
+  // Sync editor instance to store (once)
   useEffect(() => {
-    if (editor && editor !== storedEditor) {
+    if (editor) {
       setEditor(editor)
     }
-  }, [editor, setEditor, storedEditor])
-
-  // Load scene content when active scene changes
-  useEffect(() => {
-    if (editor && activeScene) {
-      const currentJson = JSON.stringify(editor.getJSON())
-      const newJson = JSON.stringify(activeScene.content)
-      if (currentJson !== newJson) {
-        editor.commands.setContent(activeScene.content ?? "")
-      }
+    return () => {
+      // Clean up on unmount
+      setEditor(null)
     }
-  }, [activeScene?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [editor, setEditor])
 
-  // Keyboard shortcuts + custom events
+  // Scroll tracking for breadcrumb
+  useEffect(() => {
+    if (!editor) return
+    const editorEl = editor.view.dom.parentElement
+    if (!editorEl) return
+
+    const onScroll = () => {
+      const headings = headingRef
+      if (headings.length === 0) {
+        setActiveHeading("")
+        return
+      }
+
+      const viewportCenter = editorEl.getBoundingClientRect().top + window.innerHeight / 3
+      let closest = ""
+      let closestDist = Infinity
+
+      for (const h of headings) {
+        try {
+          const pos = editor.view.coordsAtPos(h.pos)
+          if (!pos) continue
+          const dist = Math.abs(pos.top - viewportCenter)
+          if (dist < closestDist) {
+            closestDist = dist
+            closest = h.text
+          }
+        } catch {
+          // coordsAtPos can throw for positions outside the document
+          continue
+        }
+      }
+
+      setActiveHeading(closest)
+    }
+
+    editorEl.addEventListener("scroll", onScroll, { passive: true })
+    return () => editorEl.removeEventListener("scroll", onScroll)
+  }, [editor, headingRef, setActiveHeading])
+
+  // Keyboard shortcuts
   useEffect(() => {
     if (!editor) return
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ctrl+Shift+F: focus mode toggle
       if (e.key === "F" && e.ctrlKey && e.shiftKey) {
         e.preventDefault()
         setFocusMode(!isFocusMode)

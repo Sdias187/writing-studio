@@ -3,7 +3,7 @@ import { ArrowLeft, Download } from "lucide-react"
 import { IconButton } from "@/components/ui/button"
 import { useEditorStore } from "@/stores/editor-store"
 import { useProjectStore } from "@/stores/project-store"
-import { exportSceneAsMarkdown, exportSceneAsTxt, exportProjectAsMarkdown, exportProjectAsTxt } from "@/lib/export"
+import { exportProjectAsMarkdown, exportProjectAsTxt } from "@/lib/export"
 import { createBackup, downloadBackup, parseBackupFile, restoreBackup } from "@/lib/backup"
 import type { ProjectView } from "@/App"
 
@@ -33,7 +33,7 @@ interface TopBarProps {
 }
 
 export function TopBar({ onBack, currentView = "editor", onNavigate: _onNavigate }: TopBarProps) {
-  const { saveStatus, wordCount, isFocusMode, setFocusMode, editor, activeScene, content, save } = useEditorStore()
+  const { saveStatus, wordCount, isFocusMode, setFocusMode, editor, save, activeHeading } = useEditorStore()
   const { currentProject } = useProjectStore()
   const [showExport, setShowExport] = useState(false)
   const exportRef = useRef<HTMLDivElement>(null)
@@ -71,7 +71,9 @@ export function TopBar({ onBack, currentView = "editor", onNavigate: _onNavigate
           {currentProject?.title ?? "Sem projeto"}
         </span>
         <span className="text-xs text-ink-tertiary">/</span>
-        <span className="text-sm text-ink-secondary">{viewTitles[currentView]}</span>
+        <span className="text-sm text-ink-secondary truncate max-w-[200px]">
+          {currentView === "editor" && activeHeading ? activeHeading : viewTitles[currentView]}
+        </span>
       </div>
 
       <div className="flex items-center gap-1">
@@ -101,30 +103,6 @@ export function TopBar({ onBack, currentView = "editor", onNavigate: _onNavigate
 
               {showExport && (
                 <div className="absolute right-0 top-full mt-1 min-w-[220px] bg-elevated border border-border rounded-xl p-1 z-50">
-                  <div className="px-3 py-1.5 text-[10px] text-ink-tertiary uppercase tracking-wider font-medium">
-                    Cena atual
-                  </div>
-                  <button
-                    onClick={() => {
-                      if (activeScene) exportSceneAsMarkdown({ ...activeScene, content: content ?? activeScene.content })
-                      setShowExport(false)
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-ink-secondary hover:text-ink-primary hover:bg-chrome rounded-lg transition-colors text-left"
-                  >
-                    Exportar como Markdown
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (activeScene) exportSceneAsTxt({ ...activeScene, content: content ?? activeScene.content })
-                      setShowExport(false)
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-ink-secondary hover:text-ink-primary hover:bg-chrome rounded-lg transition-colors text-left"
-                  >
-                    Exportar como TXT
-                  </button>
-
-                  <div className="h-px bg-border my-1" />
-
                   <div className="px-3 py-1.5 text-[10px] text-ink-tertiary uppercase tracking-wider font-medium">
                     Projeto
                   </div>

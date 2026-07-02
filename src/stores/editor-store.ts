@@ -1,25 +1,23 @@
 import { create } from "zustand"
-import type { Scene } from "@/types"
-import { saveScene, getScene } from "@/db"
+import type { HeadingInfo } from "@/types"
 
 export type SaveStatus = "saved" | "saving" | "unsaved"
 
 interface EditorState {
-  activeSceneId: string | null
-  activeScene: Scene | null
   content: object | null
-  title: string
   wordCount: number
   saveStatus: SaveStatus
   isFocusMode: boolean
   editor: any | null
+  headings: HeadingInfo[]
+  activeHeading: string
 
-  setActiveScene: (sceneId: string) => Promise<void>
   setContent: (content: object) => void
-  setTitle: (title: string) => void
   setWordCount: (count: number) => void
   setEditor: (editor: any) => void
   setFocusMode: (enabled: boolean) => void
+  setHeadings: (headings: HeadingInfo[]) => void
+  setActiveHeading: (text: string) => void
 
   save: () => Promise<void>
   autoSave: () => Promise<void>
@@ -28,34 +26,16 @@ interface EditorState {
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 
 export const useEditorStore = create<EditorState>((set, get) => ({
-  activeSceneId: null,
-  activeScene: null,
   content: null,
-  title: "",
   wordCount: 0,
   saveStatus: "saved",
   isFocusMode: false,
   editor: null,
-
-  setActiveScene: async (sceneId: string) => {
-    const scene = await getScene(sceneId)
-    if (!scene) return
-    set({
-      activeSceneId: sceneId,
-      activeScene: scene,
-      content: scene.content,
-      title: scene.title,
-      wordCount: scene.wordCount,
-      saveStatus: "saved",
-    })
-  },
+  headings: [],
+  activeHeading: "",
 
   setContent: (content: object) => {
     set({ content, saveStatus: "unsaved" })
-  },
-
-  setTitle: (title: string) => {
-    set({ title, saveStatus: "unsaved" })
   },
 
   setWordCount: (wordCount: number) => {
@@ -70,28 +50,30 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ isFocusMode })
   },
 
+  setHeadings: (headings: HeadingInfo[]) => {
+    set({ headings })
+  },
+
+  setActiveHeading: (text: string) => {
+    set({ activeHeading: text })
+  },
+
   save: async () => {
-    const { activeSceneId, content, title, wordCount, activeScene } = get()
-    if (!activeSceneId || !content) return
+    const { editor, content } = get()
 
-    set({ saveStatus: "saving" })
-
-    const now = new Date().toISOString()
-    const updatedScene: Scene = {
-      id: activeSceneId,
-      chapterId: activeScene?.chapterId ?? "",
-      projectId: activeScene?.projectId ?? "",
-      title,
-      content,
-      wordCount,
-      order: activeScene?.order ?? 0,
-      createdAt: activeScene?.createdAt ?? now,
-      updatedAt: now,
+    // Try to get content from editor first (most current), fall back to store
+    let json = content
+    if (editor?.getJSON) {
+      json = editor.getJSON() as object
     }
 
-    await saveScene(updatedScene)
+    if (!json) return
 
-    set({ saveStatus: "saved", activeScene: updatedScene })
+    set({ saveStatus: "saving" })
+    const { useProjectStore } = await import("@/stores/project-store")
+    await useProjectStore.getState().updateProjectContent(json)
+    // Update store content to stay in sync
+    set({ content: json, saveStatus: "saved" })
   },
 
   autoSave: async () => {

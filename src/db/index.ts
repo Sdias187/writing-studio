@@ -19,6 +19,21 @@ export class AzothDB extends Dexie {
       locations: "id, projectId",
       notes: "id, projectId",
     })
+
+    this.version(4).stores({
+      projects: "id, title, createdAt, updatedAt",
+      chapters: "id, projectId, order",
+      scenes: "id, chapterId, projectId, order",
+      characters: "id, projectId",
+      locations: "id, projectId",
+      notes: "id, projectId",
+    }).upgrade((tx) => {
+      // Add content field to all existing projects
+      tx.table("projects").toCollection().modify((project: any) => {
+        project.content = null
+        project.chapterSynopses = {}
+      })
+    })
   }
 }
 

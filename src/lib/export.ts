@@ -1,4 +1,3 @@
-import type { Scene } from "@/types"
 import { db } from "@/db"
 
 type PMNode = {
@@ -142,42 +141,12 @@ function downloadFile(content: string, filename: string, mimeType: string): void
   URL.revokeObjectURL(url)
 }
 
-function sceneFilename(scene: Scene, ext: string): string {
-  const safeName = scene.title.replace(/[^a-zA-Z0-9_\- ]/g, "").trim().replace(/\s+/g, "_")
-  return `${safeName}.${ext}`
-}
-
-export function exportSceneAsMarkdown(scene: Scene): void {
-  const content = scene.content ? proseMirrorToMarkdown(scene.content as PMNode) : ""
-  const header = `# ${scene.title}\n\n`
-  downloadFile(header + content, sceneFilename(scene, "md"), "text/markdown")
-}
-
-export function exportSceneAsTxt(scene: Scene): void {
-  const content = scene.content ? proseMirrorToPlainText(scene.content as PMNode) : ""
-  const header = `${scene.title}\n${"=".repeat(scene.title.length)}\n\n`
-  downloadFile(header + content, sceneFilename(scene, "txt"), "text/plain")
-}
-
 export async function exportProjectAsMarkdown(projectId: string, projectTitle: string): Promise<void> {
-  const chapters = await db.chapters.where("projectId").equals(projectId).sortBy("order")
+  const project = await db.projects.get(projectId)
   const lines: string[] = [`# ${projectTitle}\n`]
 
-  for (const chapter of chapters) {
-    const scenes = await db.scenes.where("chapterId").equals(chapter.id).sortBy("order")
-    if (scenes.length === 0) {
-      lines.push(`\n## ${chapter.title}\n\n*Este capítulo está vazio.*\n`)
-      continue
-    }
-
-    lines.push(`\n## ${chapter.title}\n`)
-    for (const scene of scenes) {
-      lines.push(`### ${scene.title}\n`)
-      if (scene.content) {
-        lines.push(proseMirrorToMarkdown(scene.content as PMNode))
-      }
-      lines.push("\n---\n")
-    }
+  if (project?.content) {
+    lines.push(proseMirrorToMarkdown(project.content as PMNode))
   }
 
   const safeName = projectTitle.replace(/[^a-zA-Z0-9_\- ]/g, "").trim().replace(/\s+/g, "_")
@@ -185,24 +154,11 @@ export async function exportProjectAsMarkdown(projectId: string, projectTitle: s
 }
 
 export async function exportProjectAsTxt(projectId: string, projectTitle: string): Promise<void> {
-  const chapters = await db.chapters.where("projectId").equals(projectId).sortBy("order")
+  const project = await db.projects.get(projectId)
   const lines: string[] = [`${projectTitle}\n${"=".repeat(projectTitle.length)}\n`]
 
-  for (const chapter of chapters) {
-    const scenes = await db.scenes.where("chapterId").equals(chapter.id).sortBy("order")
-    if (scenes.length === 0) {
-      lines.push(`\n${chapter.title}\n${"-".repeat(chapter.title.length)}\n\n[empty]\n`)
-      continue
-    }
-
-    lines.push(`\n${chapter.title}\n${"-".repeat(chapter.title.length)}\n`)
-    for (const scene of scenes) {
-      lines.push(`\n${scene.title}\n${"~".repeat(scene.title.length)}\n`)
-      if (scene.content) {
-        lines.push(proseMirrorToPlainText(scene.content as PMNode))
-      }
-      lines.push("\n")
-    }
+  if (project?.content) {
+    lines.push(proseMirrorToPlainText(project.content as PMNode))
   }
 
   const safeName = projectTitle.replace(/[^a-zA-Z0-9_\- ]/g, "").trim().replace(/\s+/g, "_")

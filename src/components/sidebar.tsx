@@ -1,306 +1,195 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { useProjectStore } from "@/stores/project-store"
-import { FileText, Plus, Trash2, ChevronRight, ChevronDown, Users, MapPin, StickyNote, GripVertical } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { db, deleteChapter as dbDeleteChapter } from "@/db"
-import type { Scene } from "@/types"
+import { useEditorStore } from "@/stores/editor-store"
+import { Edit3, Users, MapPin, StickyNote, Plus, Heading1, BookOpen } from "lucide-react"
 import type { ProjectView } from "@/App"
-import { DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core"
-import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable"
-import { CSS } from "@dnd-kit/utilities"
-import { reorderItems } from "@/db"
 
 interface SidebarProps {
-  onSelectScene: (sceneId: string) => void
-  activeSceneId: string | null
   currentView: ProjectView
   onNavigate: (view: ProjectView) => void
 }
 
+function navigateToEditor(onNavigate: (view: ProjectView) => void) {
+  onNavigate("editor")
+}
+
 const navItems: { view: ProjectView; label: string; icon: typeof Users }[] = [
+  { view: "editor", label: "Escrita", icon: Edit3 },
   { view: "characters", label: "Personagens", icon: Users },
   { view: "locations", label: "Locais", icon: MapPin },
   { view: "notes", label: "Notas", icon: StickyNote },
 ]
 
-interface SortableSceneItemProps {
-  scene: Scene
-  isActive: boolean
-  onSelect: (id: string) => void
+function scrollToHeading(pos: number) {
+  const editor = useEditorStore.getState().editor
+  if (!editor) return
+  editor.commands.setTextSelection({ from: pos, to: pos })
+  editor.commands.scrollIntoView()
 }
 
-function SortableSceneItem({ scene, isActive, onSelect }: SortableSceneItemProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: scene.id,
-  })
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    zIndex: isDragging ? 10 : undefined,
-    opacity: isDragging ? 0.7 : undefined,
-  }
-
-  return (
-    <div ref={setNodeRef} style={style} className="flex items-center gap-0.5 group">
-      <button
-        className={`w-full flex items-center gap-2 px-2 py-1 rounded-lg text-left transition-colors ${
-          isActive
-            ? "bg-accent-subtle text-accent"
-            : "text-ink-tertiary hover:text-ink-secondary hover:bg-chrome"
-        }`}
-        onClick={() => onSelect(scene.id)}
-      >
-        <span
-          {...attributes}
-          {...listeners}
-          className="shrink-0 cursor-grab active:cursor-grabbing text-ink-tertiary/30 hover:text-ink-tertiary/60 transition-colors rounded p-0.5 -ml-0.5"
-          aria-label="Arrastar para reordenar"
-        >
-          <GripVertical size={11} />
-        </span>
-        <span className="text-xs truncate flex-1">{scene.title}</span>
-        <span className="text-[10px] tabular-nums opacity-60">{scene.wordCount}w</span>
-      </button>
-    </div>
-  )
+function insertChapterHeadline() {
+  const editor = useEditorStore.getState().editor
+  if (!editor) return
+  editor.chain().focus().toggleHeading({ level: 1 }).run()
 }
 
-export function Sidebar({ onSelectScene, activeSceneId, currentView, onNavigate }: SidebarProps) {
-  const { currentProject, chapters, loadChapters, createChapter } = useProjectStore()
+export function Sidebar({ currentView, onNavigate }: SidebarProps) {
+  const currentProject = useProjectStore((s) => s.currentProject)
+  const headings = useEditorStore((s) => s.headings)
   const [expandedChapters, setExpandedChapters] = useState<Set<string>>(new Set())
-  const [chapterScenes, setChapterScenes] = useState<Record<string, Scene[]>>({})
-  const [newChapterTitle, setNewChapterTitle] = useState("")
-  const [showNewChapter, setShowNewChapter] = useState(false)
+  const [synopsisOpen, setSynopsisOpen] = useState<string | null>(null)
+  const saveSynopsis = useProjectStore((s) => s.saveSynopsis)
 
-  useEffect(() => {
-    if (currentProject) {
-      loadChapters(currentProject.id)
-    }
-  }, [currentProject?.id]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    const loadAllScenes = async () => {
-      const sceneMap: Record<string, Scene[]> = {}
-      for (const chapter of chapters) {
-        sceneMap[chapter.id] = await db.scenes.where("chapterId").equals(chapter.id).sortBy("order")
-      }
-      setChapterScenes(sceneMap)
-    }
-    if (chapters.length > 0) {
-      loadAllScenes()
-    }
-  }, [chapters])
-
-  const toggleChapter = (chapterId: string) => {
+  const toggleChapter = (text: string) => {
     setExpandedChapters((prev) => {
       const next = new Set(prev)
-      if (next.has(chapterId)) next.delete(chapterId)
-      else next.add(chapterId)
+      if (next.has(text)) next.delete(text)
+      else next.add(text)
       return next
     })
   }
 
-  const handleCreateChapter = async () => {
-    if (!currentProject || !newChapterTitle.trim()) return
-    await createChapter(currentProject.id, newChapterTitle.trim())
-    setNewChapterTitle("")
-    setShowNewChapter(false)
+  const isActiveChapter = (heading: { text: string }) => {
+    return expandedChapters.has(heading.text)
   }
 
-  const handleDeleteChapter = async (chapterId: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    await dbDeleteChapter(chapterId)
-    if (currentProject) loadChapters(currentProject.id)
+  // Group: H1 = chapter, H2/H3 = sub-items under the last H1
+  const tocGroups: { chapter: typeof headings[0]; subs: typeof headings }[] = []
+  let currentGroup: (typeof tocGroups)[number] | null = null
+
+  for (const h of headings) {
+    if (h.level === 1) {
+      currentGroup = { chapter: h, subs: [] }
+      tocGroups.push(currentGroup)
+    } else if (currentGroup) {
+      currentGroup.subs.push(h)
+    }
   }
-
-  const handleCreateScene = async (chapterId: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (!currentProject) return
-    const sceneCount = (chapterScenes[chapterId] ?? []).length
-    const scene = await useProjectStore.getState().createScene(chapterId, currentProject.id, `Cena ${sceneCount + 1}`)
-    const updated = await db.scenes.where("chapterId").equals(chapterId).sortBy("order")
-    setChapterScenes((prev) => ({ ...prev, [chapterId]: updated }))
-    onSelectScene(scene.id)
-  }
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 8 },
-    })
-  )
-
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event
-    if (!over || active.id === over.id) return
-
-    // Find the chapter containing these scenes
-    const chapterId = Object.entries(chapterScenes).find(([, scenes]) =>
-      scenes.some((s) => s.id === active.id)
-    )?.[0]
-    if (!chapterId) return
-
-    const scenes = chapterScenes[chapterId]
-    const oldIndex = scenes.findIndex((s) => s.id === active.id)
-    const newIndex = scenes.findIndex((s) => s.id === over.id)
-    if (oldIndex === -1 || newIndex === -1) return
-
-    // Reorder the array
-    const reordered = [...scenes]
-    const [moved] = reordered.splice(oldIndex, 1)
-    reordered.splice(newIndex, 0, moved)
-
-    // Update local state
-    const updated = reordered.map((s, i) => ({ ...s, order: i }))
-    setChapterScenes((prev) => ({ ...prev, [chapterId]: updated }))
-
-    // Persist to IndexedDB
-    await reorderItems(
-      db.scenes,
-      updated.map((s) => ({ id: s.id, order: s.order }))
-    )
-  }
-
-  if (!currentProject) return null
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-4 border-b border-border">
-        <h2 className="text-sm font-semibold text-ink-primary truncate">{currentProject.title}</h2>
+      {/* Project title & chapter controls */}
+      <div className="px-4 py-4 border-b border-border">
+        <div className="flex items-center gap-2 mb-2">
+          <BookOpen size={16} className="text-accent shrink-0" />
+          <h2 className="text-sm font-semibold truncate">{currentProject?.title ?? "Sem projeto"}</h2>
+        </div>
+        {currentProject && (
+          <button
+            onClick={insertChapterHeadline}
+            className="flex items-center gap-1.5 text-xs text-ink-tertiary hover:text-accent transition-colors"
+          >
+            <Plus size={12} />
+            <Heading1 size={12} />
+            <span>Adicionar capítulo</span>
+          </button>
+        )}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2 space-y-4">
-        {/* Navigation */}
-        <nav className="space-y-0.5">
-          <button
-            onClick={() => onNavigate("editor")}
-            className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-left transition-colors ${
-              currentView === "editor"
-                ? "bg-accent-subtle text-accent"
-                : "text-ink-secondary hover:text-ink-primary hover:bg-chrome"
-            }`}
-          >
-            <FileText size={15} />
-            <span className="text-sm">Editor</span>
-          </button>
+      {/* Table of Contents */}
+      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
+        {tocGroups.length === 0 && (
+          <p className="text-xs text-ink-tertiary px-2 py-4 italic text-center">
+            Use Heading 1 (H1) para criar capítulos
+          </p>
+        )}
 
-          {navItems.map((item) => {
-            const Icon = item.icon
-            return (
-              <button
-                key={item.view}
-                onClick={() => onNavigate(item.view)}
-                className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-left transition-colors ${
-                  currentView === item.view
-                    ? "bg-accent-subtle text-accent"
-                    : "text-ink-secondary hover:text-ink-primary hover:bg-chrome"
-                }`}
-              >
-                <Icon size={15} />
-                <span className="text-sm">{item.label}</span>
-              </button>
-            )
-          })}
-        </nav>
+        {tocGroups.map((group) => {
+          const navigateToChapter = () => {
+            navigateToEditor(onNavigate)
+            // Small timeout to let editor mount before scrolling
+            setTimeout(() => scrollToHeading(group.chapter.pos), 100)
+          }
+          const chapterId = group.chapter.text + group.chapter.pos
+          const synopsis = currentProject?.chapterSynopses[chapterId] ?? ""
 
-        {/* Chapters */}
-        <div>
-          <div className="flex items-center justify-between mb-2 px-2">
-            <span className="text-xs font-medium text-ink-tertiary uppercase tracking-wider">Capítulos</span>
+          return (
+          <div key={chapterId}>
             <button
-              onClick={() => setShowNewChapter(true)}
-              className="text-ink-tertiary hover:text-ink-primary transition-colors"
-              title="Novo capítulo"
+              onClick={() => {
+                navigateToChapter()
+                toggleChapter(group.chapter.text)
+              }}
+              className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-colors text-sm ${
+                isActiveChapter(group.chapter)
+                  ? "bg-accent-subtle text-accent"
+                  : "text-ink-secondary hover:text-ink-primary hover:bg-chrome-hover"
+              }`}
             >
-              <Plus size={14} />
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-ink-tertiary shrink-0 w-6">
+                H1
+              </span>
+              <span className="truncate">{group.chapter.text}</span>
             </button>
-          </div>
 
-          {showNewChapter && (
-            <div className="px-2 mb-2">
-              <input
-                autoFocus
-                value={newChapterTitle}
-                onChange={(e) => setNewChapterTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleCreateChapter()
-                  if (e.key === "Escape") { setShowNewChapter(false); setNewChapterTitle("") }
-                }}
-                onBlur={() => { setShowNewChapter(false); setNewChapterTitle("") }}
-                placeholder="Título do capítulo..."
-                className="w-full bg-elevated border border-border rounded-lg px-3 py-1.5 text-sm text-ink-primary placeholder:text-ink-tertiary outline-none focus:border-accent/50 transition-colors"
-              />
-            </div>
-          )}
-
-          <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-          <div className="space-y-0.5">
-            {chapters.map((chapter) => (
-              <div key={chapter.id}>
-                <div
-                  className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-chrome cursor-pointer group transition-colors"
-                  onClick={() => toggleChapter(chapter.id)}
-                >
-                  {expandedChapters.has(chapter.id) ? (
-                    <ChevronDown size={14} className="text-ink-tertiary shrink-0" />
-                  ) : (
-                    <ChevronRight size={14} className="text-ink-tertiary shrink-0" />
-                  )}
-                  <FileText size={14} className="text-ink-tertiary shrink-0" />
-                  <span className="text-sm text-ink-secondary truncate flex-1">{chapter.title}</span>
-                  <span className="text-[10px] text-ink-tertiary tabular-nums">{chapter.status === "completed" ? "✓" : "..."}</span>
-                  <div className="hidden group-hover:flex items-center gap-0.5">
-                    <button
-                      onClick={(e) => handleCreateScene(chapter.id, e)}
-                      className="text-ink-tertiary hover:text-ink-primary p-0.5"
-                      title="Nova cena"
-                    >
-                      <Plus size={12} />
-                    </button>
-                    <button
-                      onClick={(e) => handleDeleteChapter(chapter.id, e)}
-                      className="text-ink-tertiary hover:text-error p-0.5"
-                      title="Deletar capítulo"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
-                </div>
-
-                {expandedChapters.has(chapter.id) && (
-                  <div className="ml-6 space-y-0.5 mt-0.5 mb-1">
-                    <SortableContext
-                      items={(chapterScenes[chapter.id] ?? []).map((s) => s.id)}
-                      strategy={verticalListSortingStrategy}
-                    >
-                      {(chapterScenes[chapter.id] ?? []).map((scene) => (
-                        <SortableSceneItem
-                          key={scene.id}
-                          scene={scene}
-                          isActive={activeSceneId === scene.id}
-                          onSelect={onSelectScene}
-                        />
-                      ))}
-                    </SortableContext>
-                    {(chapterScenes[chapter.id] ?? []).length === 0 && (
-                      <p className="text-xs text-ink-tertiary px-2 py-1 italic">Nenhuma cena</p>
-                    )}
+            {isActiveChapter(group.chapter) && (
+              <>
+                {/* Sub-headings */}
+                {group.subs.length > 0 && (
+                  <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border pl-2">
+                    {group.subs.map((sub) => (
+                      <button
+                        key={sub.text + sub.pos}
+                        onClick={() => {
+                          navigateToEditor(onNavigate)
+                          setTimeout(() => scrollToHeading(sub.pos), 100)
+                        }}
+                        className="w-full flex items-center gap-2 px-2 py-1 rounded-md text-left transition-colors text-xs text-ink-tertiary hover:text-ink-secondary hover:bg-chrome-hover"
+                      >
+                        <span className="text-[9px] font-semibold uppercase tracking-wider text-ink-tertiary/60 shrink-0 w-5">
+                          H{sub.level}
+                        </span>
+                        <span className="truncate">{sub.text}</span>
+                      </button>
+                    ))}
                   </div>
                 )}
-              </div>
-            ))}
-          </div>
-          </DndContext>
 
-          {chapters.length === 0 && (
-            <div className="text-center py-6 px-4">
-              <p className="text-xs text-ink-tertiary mb-3">Nenhum capítulo ainda</p>
-              <Button variant="ghost" onClick={() => setShowNewChapter(true)}>
-                <Plus size={14} className="mr-1" /> Criar capítulo
-              </Button>
-            </div>
-          )}
-        </div>
+                {/* Synopsis toggle */}
+                <button
+                  onClick={() => setSynopsisOpen(synopsisOpen === chapterId ? null : chapterId)}
+                  className="ml-4 mt-0.5 text-[10px] text-ink-tertiary/50 hover:text-ink-tertiary transition-colors px-2 py-0.5"
+                >
+                  {synopsisOpen === chapterId ? "− ocultar sinopse" : synopsis ? "+ editar sinopse" : "+ adicionar sinopse"}
+                </button>
+
+                {synopsisOpen === chapterId && (
+                  <div className="ml-4 mt-1 mb-2">
+                    <textarea
+                      defaultValue={synopsis}
+                      placeholder="Sinopse do capítulo..."
+                      rows={3}
+                      onBlur={(e) => {
+                        const val = e.target.value.trim()
+                        saveSynopsis(chapterId, val)
+                      }}
+                      className="w-full text-xs bg-transparent border border-border rounded-lg px-2 py-1.5 text-ink-secondary placeholder:text-ink-tertiary/40 resize-none focus:outline-none focus:border-accent transition-colors"
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          )
+        })}
+      </div>
+
+      {/* Navigation */}
+      <div className="border-t border-border px-3 py-2">
+        {navItems.map((item) => (
+          <button
+            key={item.view}
+            onClick={() => onNavigate(item.view)}
+            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+              currentView === item.view
+                ? "bg-accent-subtle text-accent"
+                : "text-ink-tertiary hover:text-ink-secondary hover:bg-chrome-hover"
+            }`}
+          >
+            <item.icon size={15} />
+            <span>{item.label}</span>
+          </button>
+        ))}
       </div>
     </div>
   )

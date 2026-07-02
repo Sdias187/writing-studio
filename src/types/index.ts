@@ -2,6 +2,8 @@ export interface Project {
   id: string
   title: string
   description: string
+  content: object | null
+  chapterSynopses: Record<string, string>
   createdAt: string
   updatedAt: string
 }
@@ -55,4 +57,10 @@ export interface Note {
   content: string
   createdAt: string
   updatedAt: string
+}
+
+export interface HeadingInfo {
+  level: number
+  text: string
+  pos: number
 }

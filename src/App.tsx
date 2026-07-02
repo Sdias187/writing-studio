@@ -1,10 +1,9 @@
-import { useState, useEffect, useCallback, lazy, Suspense } from "react"
+import { useState, useCallback, lazy, Suspense } from "react"
 import { Dashboard } from "@/pages/dashboard"
 import { TopBar } from "@/components/top-bar"
 import { Sidebar } from "@/components/sidebar"
 import { AppShell } from "@/components/app-shell"
 import { useProjectStore } from "@/stores/project-store"
-import { useEditorStore } from "@/stores/editor-store"
 import { db } from "@/db"
 
 const Editor = lazy(() => import("@/components/editor/editor").then((m) => ({ default: m.Editor })))
@@ -17,7 +16,6 @@ export type ProjectView = "editor" | "characters" | "locations" | "notes"
 function App() {
   const [view, setView] = useState<"dashboard" | ProjectView>("dashboard")
   const { setCurrentProject } = useProjectStore()
-  const { setActiveScene, activeSceneId } = useEditorStore()
 
   const handleSelectProject = useCallback(async (projectId: string) => {
     const project = await db.projects.get(projectId)
@@ -31,38 +29,9 @@ function App() {
     setView("dashboard")
   }, [])
 
-  const handleSelectScene = useCallback(async (sceneId: string) => {
-    await setActiveScene(sceneId)
-    setView("editor")
-  }, [setActiveScene])
-
   const handleNavigate = useCallback((subview: ProjectView) => {
     setView(subview)
   }, [])
-
-  // Auto-select first scene when editor opens
-  useEffect(() => {
-    if (view === "editor") {
-      const init = async () => {
-        const chapters = await db.chapters
-          .where("projectId")
-          .equals(useProjectStore.getState().currentProject?.id ?? "")
-          .sortBy("order")
-
-        if (chapters.length > 0) {
-          const scenes = await db.scenes
-            .where("chapterId")
-            .equals(chapters[0].id)
-            .sortBy("order")
-
-          if (scenes.length > 0 && !activeSceneId) {
-            await setActiveScene(scenes[0].id)
-          }
-        }
-      }
-      init()
-    }
-  }, [view]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (view === "dashboard") {
     return <Dashboard onSelectProject={handleSelectProject} />
@@ -84,14 +53,7 @@ function App() {
   return (
     <AppShell
       topbar={<TopBar onBack={handleBack} currentView={view} onNavigate={handleNavigate} />}
-      sidebar={
-        <Sidebar
-          onSelectScene={handleSelectScene}
-          activeSceneId={activeSceneId}
-          currentView={view}
-          onNavigate={handleNavigate}
-        />
-      }
+      sidebar={<Sidebar currentView={view} onNavigate={handleNavigate} />}
     >
       <Suspense fallback={null}>
         {renderContent()}

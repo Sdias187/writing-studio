@@ -1,30 +1,24 @@
 import { create } from "zustand"
-import type { Project, Chapter, Scene } from "@/types"
-import { getProjects, getChapters, getScenes, saveProject, saveChapter, saveScene, deleteProject as dbDeleteProject } from "@/db"
+import type { Project } from "@/types"
+import { getProjects, saveProject, deleteProject as dbDeleteProject } from "@/db"
 import { generateId } from "@/lib/utils"
 
 interface ProjectState {
   projects: Project[]
   currentProject: Project | null
-  chapters: Chapter[]
-  scenes: Scene[]
   isLoading: boolean
 
   loadProjects: () => Promise<void>
   setCurrentProject: (project: Project) => Promise<void>
   createProject: (title: string, description?: string) => Promise<Project>
   deleteProject: (id: string) => Promise<void>
-  loadChapters: (projectId: string) => Promise<void>
-  createChapter: (projectId: string, title: string) => Promise<Chapter>
-  loadScenes: (chapterId: string) => Promise<void>
-  createScene: (chapterId: string, projectId: string, title: string) => Promise<Scene>
+  updateProjectContent: (content: object) => Promise<void>
+  saveSynopsis: (chapterId: string, synopsis: string) => Promise<void>
 }
 
-export const useProjectStore = create<ProjectState>((set, _get) => ({
+export const useProjectStore = create<ProjectState>((set, get) => ({
   projects: [],
   currentProject: null,
-  chapters: [],
-  scenes: [],
   isLoading: false,
 
   loadProjects: async () => {
@@ -35,14 +29,6 @@ export const useProjectStore = create<ProjectState>((set, _get) => ({
 
   setCurrentProject: async (project: Project) => {
     set({ currentProject: project })
-    const chapters = await getChapters(project.id)
-    set({ chapters })
-    if (chapters.length > 0) {
-      const scenes = await getScenes(chapters[0].id)
-      set({ scenes })
-    } else {
-      set({ scenes: [] })
-    }
   },
 
   createProject: async (title: string, description = "") => {
@@ -50,6 +36,8 @@ export const useProjectStore = create<ProjectState>((set, _get) => ({
       id: generateId(),
       title,
       description,
+      content: null,
+      chapterSynopses: {},
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
@@ -65,64 +53,30 @@ export const useProjectStore = create<ProjectState>((set, _get) => ({
     set({ projects })
   },
 
-  loadChapters: async (projectId: string) => {
-    const chapters = await getChapters(projectId)
-    set({ chapters })
-  },
-
-  createChapter: async (projectId: string, title: string) => {
-    const chapters = await getChapters(projectId)
-    const chapter: Chapter = {
-      id: generateId(),
-      projectId,
-      title,
-      order: chapters.length,
-      status: "draft",
-      createdAt: new Date().toISOString(),
+  updateProjectContent: async (content: object) => {
+    const { currentProject } = get()
+    if (!currentProject) return
+    const updated: Project = {
+      ...currentProject,
+      content,
       updatedAt: new Date().toISOString(),
     }
-    await saveChapter(chapter)
-    const updated = await getChapters(projectId)
-    set({ chapters: updated })
-
-    const scene: Scene = {
-      id: generateId(),
-      chapterId: chapter.id,
-      projectId,
-      title: "Cena 1",
-      content: null,
-      wordCount: 0,
-      order: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
-    await saveScene(scene)
-    set({ scenes: [scene] })
-
-    return chapter
+    await saveProject(updated)
+    set({ currentProject: updated })
   },
 
-  loadScenes: async (chapterId: string) => {
-    const scenes = await getScenes(chapterId)
-    set({ scenes })
-  },
-
-  createScene: async (chapterId: string, projectId: string, title: string) => {
-    const scenes = await getScenes(chapterId)
-    const scene: Scene = {
-      id: generateId(),
-      chapterId,
-      projectId,
-      title,
-      content: null,
-      wordCount: 0,
-      order: scenes.length,
-      createdAt: new Date().toISOString(),
+  saveSynopsis: async (chapterId: string, synopsis: string) => {
+    const { currentProject } = get()
+    if (!currentProject) return
+    const updated: Project = {
+      ...currentProject,
+      chapterSynopses: {
+        ...currentProject.chapterSynopses,
+        [chapterId]: synopsis,
+      },
       updatedAt: new Date().toISOString(),
     }
-    await saveScene(scene)
-    const updated = await getScenes(chapterId)
-    set({ scenes: updated })
-    return scene
+    await saveProject(updated)
+    set({ currentProject: updated })
   },
 }))

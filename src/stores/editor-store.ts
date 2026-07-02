@@ -6,11 +6,23 @@ export type SearchResult = { from: number; to: number }
 
 export type SaveStatus = "saved" | "saving" | "unsaved"
 
+export type EditorFont = "sans" | "serif" | "mono" | "literata" | "playfair"
+
+export const FONT_OPTIONS: { id: EditorFont; label: string; className: string; preview: string }[] = [
+  { id: "sans", label: "Inter", className: "font-sans", preview: "Inter" },
+  { id: "serif", label: "Georgia", className: "font-serif", preview: "Georgia" },
+  { id: "mono", label: "JetBrains Mono", className: "font-mono", preview: "JetBrains Mono" },
+  { id: "literata", label: "Literata", className: "font-literata", preview: "Literata" },
+  { id: "playfair", label: "Playfair Display", className: "font-playfair", preview: "Playfair Display" },
+]
+
 interface EditorState {
   content: object | null
   wordCount: number
   saveStatus: SaveStatus
   isFocusMode: boolean
+  typewriterMode: boolean
+  editorFont: EditorFont
   editor: Editor | null
   headings: HeadingInfo[]
   activeHeading: string
@@ -19,6 +31,8 @@ interface EditorState {
   setWordCount: (count: number) => void
   setEditor: (editor: Editor | null) => void
   setFocusMode: (enabled: boolean) => void
+  setTypewriterMode: (enabled: boolean) => void
+  setEditorFont: (font: EditorFont) => void
   setHeadings: (headings: HeadingInfo[]) => void
   setActiveHeading: (text: string) => void
 
@@ -43,6 +57,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   wordCount: 0,
   saveStatus: "saved",
   isFocusMode: false,
+  typewriterMode: false,
+  editorFont: "sans",
   editor: null,
   headings: [],
   activeHeading: "",
@@ -65,6 +81,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   setFocusMode: (isFocusMode: boolean) => {
     set({ isFocusMode })
+  },
+
+  setTypewriterMode: (typewriterMode: boolean) => {
+    set({ typewriterMode })
+  },
+
+  setEditorFont: (editorFont: EditorFont) => {
+    set({ editorFont })
   },
 
   setHeadings: (headings: HeadingInfo[]) => {

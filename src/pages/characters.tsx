@@ -2,8 +2,9 @@ import { useEffect, useState } from "react"
 import { useProjectStore } from "@/stores/project-store"
 import { Plus, Trash2, Pencil, Save, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { db } from "@/db"
+import { getCharacters, saveCharacter, deleteCharacter } from "@/lib/supabase-db"
 import { generateId } from "@/lib/utils"
+import { useAuthStore } from "@/stores/auth-store"
 import type { Character } from "@/types"
 
 export function CharactersPage() {
@@ -21,28 +22,30 @@ export function CharactersPage() {
 
   const loadCharacters = async () => {
     if (!currentProject) return
-    const chars = await db.characters.where("projectId").equals(currentProject.id).toArray()
+    const chars = await getCharacters(currentProject.id)
     setCharacters(chars)
   }
 
   const handleCreate = async () => {
     if (!currentProject || !newName.trim()) return
+    const user = useAuthStore.getState().user
     const char: Character = {
       id: generateId(),
+      userId: user?.id ?? "",
       projectId: currentProject.id,
       name: newName.trim(),
       description: "",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
-    await db.characters.put(char)
+    await saveCharacter(char)
     setNewName("")
     setShowNew(false)
     loadCharacters()
   }
 
   const handleDelete = async (id: string) => {
-    await db.characters.delete(id)
+    await deleteCharacter(id)
     loadCharacters()
   }
 
@@ -50,7 +53,7 @@ export function CharactersPage() {
     if (!editingId || !editName.trim()) return
     const existing = characters.find((c) => c.id === editingId)
     if (!existing) return
-    await db.characters.put({
+    await saveCharacter({
       ...existing,
       name: editName.trim(),
       description: editDescription.trim(),

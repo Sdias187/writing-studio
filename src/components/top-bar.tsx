@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react"
-import { ArrowLeft, Download, LogOut } from "lucide-react"
+import { ArrowLeft, Download, LogOut, AlignCenter } from "lucide-react"
 import { IconButton } from "@/components/ui/button"
-import { useEditorStore } from "@/stores/editor-store"
+import { useEditorStore, FONT_OPTIONS } from "@/stores/editor-store"
 import { useProjectStore } from "@/stores/project-store"
 import { useAuthStore } from "@/stores/auth-store"
 import { exportProjectAsMarkdown, exportProjectAsTxt } from "@/lib/export"
@@ -34,23 +34,28 @@ interface TopBarProps {
 }
 
 export function TopBar({ onBack, currentView = "editor", onNavigate: _onNavigate }: TopBarProps) {
-  const { saveStatus, wordCount, isFocusMode, setFocusMode, editor, save, activeHeading } = useEditorStore()
+  const { saveStatus, wordCount, isFocusMode, setFocusMode, editorFont, setEditorFont, typewriterMode, setTypewriterMode, editor, save, activeHeading } = useEditorStore()
   const { currentProject } = useProjectStore()
   const [showExport, setShowExport] = useState(false)
+  const [fontOpen, setFontOpen] = useState(false)
   const exportRef = useRef<HTMLDivElement>(null)
+  const fontRef = useRef<HTMLDivElement>(null)
   const backupInputRef = useRef<HTMLInputElement>(null)
 
-  // Close export dropdown on outside click
+  // Close dropdowns on outside click
   useEffect(() => {
-    if (!showExport) return
+    if (!showExport && !fontOpen) return
     const handleClick = (e: MouseEvent) => {
-      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
+      if (showExport && exportRef.current && !exportRef.current.contains(e.target as Node)) {
         setShowExport(false)
+      }
+      if (fontOpen && fontRef.current && !fontRef.current.contains(e.target as Node)) {
+        setFontOpen(false)
       }
     }
     document.addEventListener("mousedown", handleClick)
     return () => document.removeEventListener("mousedown", handleClick)
-  }, [showExport])
+  }, [showExport, fontOpen])
 
   if (isFocusMode) {
     return (
@@ -185,6 +190,55 @@ export function TopBar({ onBack, currentView = "editor", onNavigate: _onNavigate
 
             <IconButton onClick={() => setFocusMode(true)} title="Modo foco (Ctrl+Shift+F)">
               <span className="text-xs">⛶</span>
+            </IconButton>
+
+            <div className="w-px h-5 bg-border mx-1" />
+
+            {/* Font selector dropdown */}
+            <div className="relative" ref={fontRef}>
+              <button
+                onClick={() => setFontOpen(!fontOpen)}
+                className="flex items-center gap-1.5 px-2 py-1 text-[11px] rounded-md transition-colors hover:bg-chrome/30"
+                title="Fonte do editor"
+              >
+                <span className={FONT_OPTIONS.find((f) => f.id === editorFont)?.className ?? "font-sans"}>
+                  {FONT_OPTIONS.find((f) => f.id === editorFont)?.label ?? "Inter"}
+                </span>
+                <svg width="8" height="5" viewBox="0 0 8 5" fill="none" className="text-ink-tertiary">
+                  <path d="M1 1L4 4L7 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+
+              {fontOpen && (
+                <div className="absolute right-0 top-full mt-1 min-w-[160px] bg-elevated border border-border rounded-xl p-1 z-50">
+                  {FONT_OPTIONS.map((font) => (
+                    <button
+                      key={font.id}
+                      onClick={() => { setEditorFont(font.id); setFontOpen(false) }}
+                      className={`w-full flex items-center justify-between gap-3 px-3 py-1.5 text-sm rounded-lg transition-colors text-left ${
+                        editorFont === font.id
+                          ? "text-accent bg-accent-subtle"
+                          : "text-ink-secondary hover:text-ink-primary hover:bg-chrome"
+                      }`}
+                    >
+                      <span className={font.className}>{font.preview}</span>
+                      {editorFont === font.id && (
+                        <svg width="12" height="9" viewBox="0 0 12 9" fill="none" className="shrink-0">
+                          <path d="M1 4.5L4.5 8L11 1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Typewriter toggle */}
+            <IconButton
+              onClick={() => setTypewriterMode(!typewriterMode)}
+              title={typewriterMode ? "Desativar modo typewriter" : "Ativar modo typewriter"}
+            >
+              <AlignCenter size={15} className={typewriterMode ? "text-accent" : ""} />
             </IconButton>
           </>
         )}

@@ -1,5 +1,6 @@
 export interface Project {
   id: string
+  userId: string
   title: string
   description: string
   content: object | null
@@ -10,6 +11,7 @@ export interface Project {
 
 export interface Chapter {
   id: string
+  userId: string
   projectId: string
   title: string
   order: number
@@ -22,6 +24,7 @@ export type ChapterStatus = "draft" | "in_revision" | "completed"
 
 export interface Scene {
   id: string
+  userId: string
   chapterId: string
   projectId: string
   title: string
@@ -34,6 +37,7 @@ export interface Scene {
 
 export interface Character {
   id: string
+  userId: string
   projectId: string
   name: string
   description: string
@@ -43,6 +47,7 @@ export interface Character {
 
 export interface Location {
   id: string
+  userId: string
   projectId: string
   name: string
   description: string
@@ -52,6 +57,7 @@ export interface Location {
 
 export interface Note {
   id: string
+  userId: string
   projectId: string
   title: string
   content: string

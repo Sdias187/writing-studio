@@ -1,4 +1,4 @@
-import { db } from "@/db"
+import { getProject } from "@/lib/supabase-db"
 
 type PMNode = {
   type: string
@@ -142,7 +142,7 @@ function downloadFile(content: string, filename: string, mimeType: string): void
 }
 
 export async function exportProjectAsMarkdown(projectId: string, projectTitle: string): Promise<void> {
-  const project = await db.projects.get(projectId)
+  const project = await getProject(projectId)
   const lines: string[] = [`# ${projectTitle}\n`]
 
   if (project?.content) {
@@ -154,7 +154,7 @@ export async function exportProjectAsMarkdown(projectId: string, projectTitle: s
 }
 
 export async function exportProjectAsTxt(projectId: string, projectTitle: string): Promise<void> {
-  const project = await db.projects.get(projectId)
+  const project = await getProject(projectId)
   const lines: string[] = [`${projectTitle}\n${"=".repeat(projectTitle.length)}\n`]
 
   if (project?.content) {

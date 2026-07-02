@@ -1,4 +1,4 @@
-import { db } from "@/db"
+import { supabase } from "@/lib/supabase"
 
 export interface BackupData {
   version: number
@@ -13,14 +13,19 @@ export interface BackupData {
 
 const BACKUP_VERSION = 1
 
+async function fetchAll(table: string) {
+  const { data } = await supabase.from(table).select("*")
+  return data ?? []
+}
+
 export async function createBackup(): Promise<BackupData> {
   const [projects, chapters, scenes, characters, locations, notes] = await Promise.all([
-    db.projects.toArray(),
-    db.chapters.toArray(),
-    db.scenes.toArray(),
-    db.characters.toArray(),
-    db.locations.toArray(),
-    db.notes.toArray(),
+    fetchAll("projects"),
+    fetchAll("chapters"),
+    fetchAll("scenes"),
+    fetchAll("characters"),
+    fetchAll("locations"),
+    fetchAll("notes"),
   ])
 
   return {
@@ -65,30 +70,19 @@ export function parseBackupFile(json: string): BackupData {
 }
 
 export async function restoreBackup(data: BackupData): Promise<void> {
-  const tables = [db.projects, db.chapters, db.scenes, db.characters, db.locations, db.notes] as const
-  await db.transaction(
-    "rw",
-    tables,
-    async () => {
-      // Clear existing data
-      await Promise.all([
-        db.projects.clear(),
-        db.chapters.clear(),
-        db.scenes.clear(),
-        db.characters.clear(),
-        db.locations.clear(),
-        db.notes.clear(),
-      ])
+  const tables = ["projects", "chapters", "scenes", "characters", "locations", "notes"] as const
 
-      // Import backup data
-      await Promise.all([
-        db.projects.bulkPut(data.projects as any),
-        db.chapters.bulkPut(data.chapters as any),
-        db.scenes.bulkPut(data.scenes as any),
-        db.characters.bulkPut(data.characters as any),
-        db.locations.bulkPut(data.locations as any),
-        db.notes.bulkPut(data.notes as any),
-      ])
+  // Delete all current user's data from each table
+  for (const table of tables) {
+    await supabase.from(table).delete().neq("id", "00000000-0000-0000-0000-000000000000")
+  }
+
+  // Insert backup data into each table
+  for (const table of tables) {
+    const rows = data[table]
+    if (rows.length > 0) {
+      const { error } = await supabase.from(table).insert(rows as any)
+      if (error) throw error
     }
-  )
+  }
 }

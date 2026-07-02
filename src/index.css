@@ -26,6 +26,9 @@
 
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
   --font-mono: "JetBrains Mono", "Fira Code", monospace;
+  --font-serif: Georgia, "Times New Roman", serif;
+  --font-literata: "Literata", Georgia, serif;
+  --font-playfair: "Playfair Display", Georgia, serif;
 }
 
 /* ─── Base ─── */

@@ -7,7 +7,7 @@ import { AppShell } from "@/components/app-shell"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { useProjectStore } from "@/stores/project-store"
 import { useAuthStore } from "@/stores/auth-store"
-import { db } from "@/db"
+import { getProject } from "@/lib/supabase-db"
 
 const Editor = lazy(() => import("@/components/editor/editor").then((m) => ({ default: m.Editor })))
 const CharactersPage = lazy(() => import("@/pages/characters").then((m) => ({ default: m.CharactersPage })))
@@ -26,7 +26,7 @@ function App() {
   }, [initialize])
 
   const handleSelectProject = useCallback(async (projectId: string) => {
-    const project = await db.projects.get(projectId)
+    const project = await getProject(projectId)
     if (project) {
       await setCurrentProject(project)
       setView("editor")

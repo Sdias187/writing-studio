@@ -24,7 +24,7 @@ import { SlashMenu } from "./slash-menu"
 import { FloatingToolbar } from "./floating-toolbar/floating-toolbar"
 import { SearchPanel } from "./search-panel"
 import { searchPlugin } from "./search-plugin"
-import { useEditorStore } from "@/stores/editor-store"
+import { useEditorStore, FONT_OPTIONS } from "@/stores/editor-store"
 import { useProjectStore } from "@/stores/project-store"
 import { wordCount, parseHeadings } from "@/lib/utils"
 import { clearSearchDecorations } from "./search-plugin"
@@ -51,6 +51,8 @@ export function Editor() {
   const contentRef = useRef<object | null>(null)
   const initialLoadDone = useRef(false)
   const isFocusMode = useEditorStore((s) => s.isFocusMode)
+  const typewriterMode = useEditorStore((s) => s.typewriterMode)
+  const editorFont = useEditorStore((s) => s.editorFont)
   const setEditor = useEditorStore((s) => s.setEditor)
   const setWordCount = useEditorStore((s) => s.setWordCount)
   const setHeadings = useEditorStore((s) => s.setHeadings)
@@ -162,6 +164,40 @@ export function Editor() {
     return () => editorEl.removeEventListener("scroll", onScroll)
   }, [editor, setActiveHeading])
 
+  // Typewriter mode: keep cursor vertically centered
+  useEffect(() => {
+    if (!editor || !typewriterMode) return
+
+    const editorEl = editor.view.dom.parentElement
+    if (!editorEl) return
+
+    const centerCursor = () => {
+      try {
+        const { from } = editor.state.selection
+        const start = editor.view.coordsAtPos(from)
+        if (!start) return
+
+        const editorRect = editorEl.getBoundingClientRect()
+        const targetCenter = editorRect.top + editorRect.height / 2
+        const offset = start.top - targetCenter
+
+        editorEl.scrollTop += offset
+      } catch {
+        // coordsAtPos can throw for positions outside the document
+      }
+    }
+
+    editor.on("selectionUpdate", centerCursor)
+    editor.on("update", centerCursor)
+    // Center on initial activation
+    requestAnimationFrame(centerCursor)
+
+    return () => {
+      editor.off("selectionUpdate", centerCursor)
+      editor.off("update", centerCursor)
+    }
+  }, [editor, typewriterMode])
+
   // Beforeunload: warn if unsaved changes
   useEffect(() => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -240,7 +276,7 @@ export function Editor() {
     <>
       {searchPanel}
     <div className={`relative transition-all duration-300 pb-24 ${isFocusMode ? "max-w-3xl mx-auto" : ""}`}>
-      <div className="relative">
+      <div className={`relative ${FONT_OPTIONS.find((f) => f.id === editorFont)?.className ?? "font-sans"}`}>
           {editor && <BubbleMenu editor={editor} />}
           {editor && <SlashMenu editor={editor} />}
           <EditorContent editor={editor} />

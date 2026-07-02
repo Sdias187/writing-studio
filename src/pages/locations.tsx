@@ -2,8 +2,9 @@ import { useEffect, useState } from "react"
 import { useProjectStore } from "@/stores/project-store"
 import { Plus, Trash2, Pencil, Save, MapPin } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { db } from "@/db"
+import { getLocations, saveLocation, deleteLocation } from "@/lib/supabase-db"
 import { generateId } from "@/lib/utils"
+import { useAuthStore } from "@/stores/auth-store"
 import type { Location } from "@/types"
 
 export function LocationsPage() {
@@ -21,28 +22,30 @@ export function LocationsPage() {
 
   const loadLocations = async () => {
     if (!currentProject) return
-    const locs = await db.locations.where("projectId").equals(currentProject.id).toArray()
+    const locs = await getLocations(currentProject.id)
     setLocations(locs)
   }
 
   const handleCreate = async () => {
     if (!currentProject || !newName.trim()) return
+    const user = useAuthStore.getState().user
     const loc: Location = {
       id: generateId(),
+      userId: user?.id ?? "",
       projectId: currentProject.id,
       name: newName.trim(),
       description: "",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
-    await db.locations.put(loc)
+    await saveLocation(loc)
     setNewName("")
     setShowNew(false)
     loadLocations()
   }
 
   const handleDelete = async (id: string) => {
-    await db.locations.delete(id)
+    await deleteLocation(id)
     loadLocations()
   }
 
@@ -50,7 +53,7 @@ export function LocationsPage() {
     if (!editingId || !editName.trim()) return
     const existing = locations.find((l) => l.id === editingId)
     if (!existing) return
-    await db.locations.put({
+    await saveLocation({
       ...existing,
       name: editName.trim(),
       description: editDescription.trim(),

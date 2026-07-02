@@ -2,8 +2,9 @@ import { useEffect, useState } from "react"
 import { useProjectStore } from "@/stores/project-store"
 import { Plus, Trash2, Pencil, Save, StickyNote } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { db } from "@/db"
+import { getNotes, saveNote, deleteNote } from "@/lib/supabase-db"
 import { generateId } from "@/lib/utils"
+import { useAuthStore } from "@/stores/auth-store"
 import type { Note } from "@/types"
 
 export function NotesPage() {
@@ -21,28 +22,30 @@ export function NotesPage() {
 
   const loadNotes = async () => {
     if (!currentProject) return
-    const items = await db.notes.where("projectId").equals(currentProject.id).toArray()
+    const items = await getNotes(currentProject.id)
     setNotes(items)
   }
 
   const handleCreate = async () => {
     if (!currentProject || !newTitle.trim()) return
+    const user = useAuthStore.getState().user
     const note: Note = {
       id: generateId(),
+      userId: user?.id ?? "",
       projectId: currentProject.id,
       title: newTitle.trim(),
       content: "",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
-    await db.notes.put(note)
+    await saveNote(note)
     setNewTitle("")
     setShowNew(false)
     loadNotes()
   }
 
   const handleDelete = async (id: string) => {
-    await db.notes.delete(id)
+    await deleteNote(id)
     loadNotes()
   }
 
@@ -50,7 +53,7 @@ export function NotesPage() {
     if (!editingId || !editTitle.trim()) return
     const existing = notes.find((n) => n.id === editingId)
     if (!existing) return
-    await db.notes.put({
+    await saveNote({
       ...existing,
       title: editTitle.trim(),
       content: editContent.trim(),

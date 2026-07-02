@@ -1,7 +1,8 @@
 import { create } from "zustand"
 import type { Project } from "@/types"
-import { getProjects, saveProject, deleteProject as dbDeleteProject } from "@/db"
+import { getProjects, saveProject, deleteProject as dbDeleteProject } from "@/lib/supabase-db"
 import { generateId } from "@/lib/utils"
+import { useAuthStore } from "@/stores/auth-store"
 
 interface ProjectState {
   projects: Project[]
@@ -22,8 +23,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   isLoading: false,
 
   loadProjects: async () => {
+    const user = useAuthStore.getState().user
+    if (!user) return
+
     set({ isLoading: true })
-    const projects = await getProjects()
+    const projects = await getProjects(user.id)
     set({ projects, isLoading: false })
   },
 
@@ -32,8 +36,12 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   createProject: async (title: string, description = "") => {
+    const user = useAuthStore.getState().user
+    if (!user) throw new Error("User not authenticated")
+
     const project: Project = {
       id: generateId(),
+      userId: user.id,
       title,
       description,
       content: null,
@@ -42,14 +50,17 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       updatedAt: new Date().toISOString(),
     }
     await saveProject(project)
-    const projects = await getProjects()
+    const projects = await getProjects(user.id)
     set({ projects })
     return project
   },
 
   deleteProject: async (id: string) => {
+    const user = useAuthStore.getState().user
+    if (!user) return
+
     await dbDeleteProject(id)
-    const projects = await getProjects()
+    const projects = await getProjects(user.id)
     set({ projects })
   },
 
